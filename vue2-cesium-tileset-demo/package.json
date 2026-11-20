@@ -1,0 +1,30 @@
+{
+  "name": "vue2-cesium-tileset-demo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "serve": "node scripts/cli.cjs serve",
+    "build": "node scripts/cli.cjs build",
+    "postinstall": "node scripts/copy-cesium.cjs",
+    "start": "node mock/serve.js"
+  },
+  "dependencies": {
+    "cesium": "1.136.0",
+    "core-js": "3",
+    "vue": "2.7.16",
+    "express": "5.1.0"
+  },
+  "devDependencies": {
+    "@vue/cli-plugin-babel": "4.5.19",
+    "@vue/cli-service": "4.5.19",
+    "vue-template-compiler": "2.7.16"
+  },
+  "browserslist": [
+    "Chrome >= 70",
+    "Edge >= 79",
+    "Firefox >= 68"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

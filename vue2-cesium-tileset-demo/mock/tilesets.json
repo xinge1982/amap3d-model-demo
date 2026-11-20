@@ -1,0 +1,73 @@
+[
+  {
+    "id": "building",
+    "name": "收费站",
+    "title": "G1503",
+    "url": "https://47.104.194.94:28199/share/shanghai_g1503/features/tileset.json",
+    "defaultLoad": false,
+    "options": {
+      "modelForwardAxis": "Y",
+      "modelUpAxis": "Z"
+    }
+  },
+  {
+    "id": "roadsurface",
+    "name": "道路面",
+    "title": "G1503",
+    "url": "https://47.104.194.94:28199/share/shanghai_g1503/roadsurface/tileset.json",
+    "defaultLoad": true,
+    "options": {
+      "modelForwardAxis": "Y",
+      "modelUpAxis": "Z"
+    }
+  },
+  {
+    "id": "tunnel",
+    "name": "隧道",
+    "title": "G1503",
+    "url": "https://47.104.194.94:28199/share/shanghai_g1503/tunnel/tileset.json",
+    "defaultLoad": true,
+    "focus": false,
+    "hideFeatureIds": [
+      "22f2729737ae3dc9702e4cee0eb3e900_1",
+      "a5bad363fc47f424ddf5091c8471480a_1",
+      "bdeeecd97342dada47213d06bbd67c2c_1",
+      "4b0a0290ad7df100b77e86839989a75e_1"
+    ],
+    "clip": {
+      "min": -10,
+      "max": 50,
+      "current": 15
+    }
+  },
+  {
+    "id": "feature",
+    "name": "设备设施",
+    "title": "G1503",
+    "defaultLoad": false,
+    "url": "https://47.104.194.94:28199/share/networks/network_shanghai_g1503_2026/tilesets/features/tileset.json"
+  },
+  {
+    "id": "bridge",
+    "name": "桥梁",
+    "title": "G1503",
+    "defaultLoad": false,
+    "url": "https://47.104.194.94:28199/share/shanghai_g1503/bridge/tileset.json"
+  },
+  {
+    "id": "tunnel_rml",
+    "name": "人民路隧道",
+    "title": "人民路",
+    "url": "https://47.104.194.94:28199/share/shanghai_g1503/tunnel_rml/tileset.json",
+    "defaultLoad": false,
+    "focus": false
+  },
+  {
+    "id": "tunnel_xjl",
+    "name": "新建路隧道",
+    "title": "新建路",
+    "url": "https://47.104.194.94:28199/share/shanghai_g1503/tunnel_xjl/tileset.json",
+    "defaultLoad": true,
+    "focus": true
+  }
+]
