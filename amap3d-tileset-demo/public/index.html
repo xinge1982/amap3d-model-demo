@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AMap3D · Tileset 单体演示</title>
+  <link rel="stylesheet" href="./vendor/cesium/Widgets/widgets.css">
+  <link rel="stylesheet" href="./style.css">
+  <script>window.CESIUM_BASE_URL = "./vendor/cesium/";</script>
+  <script src="./vendor/cesium/Cesium.js" defer></script>
+  <script src="./app.js" type="module"></script>
+</head>
+<body>
+  <main id="scene" aria-label="Cesium 三维场景"></main>
+  <aside class="panel layers" aria-labelledby="layers-title">
+    <p class="brand">AMap3D</p>
+    <h1 id="layers-title">Tileset 单体演示</h1>
+    <ul id="layer-list" aria-label="场景图层"></ul>
+    <p id="status" role="status">正在读取图层配置…</p>
+    <button id="retry-start" type="button" hidden>重新读取配置</button>
+  </aside>
+
+  <section id="selection" class="panel selection" aria-labelledby="selection-title" hidden>
+    <header class="selection-heading">
+      <h2 id="selection-title">已选单体</h2>
+      <button id="cancel" type="button" aria-label="取消选择">关闭</button>
+    </header>
+    <dl>
+      <dt>图层</dt><dd id="selected-layer"></dd>
+      <dt>单体 ID</dt><dd id="selected-id"></dd>
+    </dl>
+    <p>删除或标记替换后，原单体将从场景中隐藏。</p>
+    <p id="selection-error" role="alert" hidden></p>
+    <div class="actions">
+      <button id="replace" class="primary" type="button">标记替换</button>
+      <button id="delete" class="danger" type="button">删除单体</button>
+    </div>
+  </section>
+</body>
+</html>
