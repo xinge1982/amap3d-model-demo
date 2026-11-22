@@ -29,10 +29,16 @@ export default class TilesetScene {
       }
     }
 
+    const imageryProvider = new Cesium.UrlTemplateImageryProvider({
+      url: "https://webst01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=6&x={x}&y={y}&z={z}",
+      tilingScheme: new Cesium.WebMercatorTilingScheme(),
+      credit: "高德地图",
+    });
+
     const viewer = new Cesium.Viewer(container, {
       animation: false,
       timeline: false,
-      baseLayer: false,
+      baseLayer: new Cesium.ImageryLayer(imageryProvider),
       baseLayerPicker: false,
       geocoder: false,
       homeButton: false,
