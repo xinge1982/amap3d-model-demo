@@ -54,14 +54,14 @@
     "title": "G1503",
     "defaultLoad": true,
     "url": "http://114.255.88.211:48610/share/shanghai_g1503/network_shanghai_g1503_2026/tilesets/features/tileset.json",
-    "focus": false,
+    "focus": true,
     "viewPoint": {
-      "lon": 121.78450858,
-      "lat": 31.10448555,
-      "height": 30.945,
-      "heading": 352.521,
-      "pitch": -27.551,
-      "roll": 0
+      "lon": 121.77254986,
+      "lat": 31.13895944,
+      "height": 30.583,
+      "heading": 161.98,
+      "pitch": -29.829,
+      "roll": 360
     }
   },
   {
@@ -70,21 +70,5 @@
     "title": "G1503",
     "defaultLoad": false,
     "url": "http://114.255.88.211:48610/share/shanghai_g1503/bridge/tileset.json"
-  },
-  {
-    "id": "tunnel_rml",
-    "name": "人民路隧道",
-    "title": "人民路",
-    "url": "http://114.255.88.211:48610/share/shanghai_g1503/tunnel_rml/tileset.json",
-    "defaultLoad": false,
-    "focus": false
-  },
-  {
-    "id": "tunnel_xjl",
-    "name": "新建路隧道",
-    "title": "新建路",
-    "url": "http://114.255.88.211:48610/share/shanghai_g1503/tunnel_xjl/tileset.json",
-    "defaultLoad": false,
-    "focus": false
   }
 ]
