@@ -29,8 +29,9 @@ body { margin: 0; }
 .toolbar-title { flex: 0 0 auto; }
 .toolbar-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .toolbar-actions button { padding: 0.55rem 0.8rem; background: #172733; border-color: #344956; }
-.toolbar-actions button.place-model-button { background: #1d5a54; border-color: #3c8d83; }
-.toolbar-actions button[aria-expanded="true"] { background: #1d5a54; border-color: #3c8d83; }
+.toolbar-actions button[aria-expanded="true"],
+.toolbar-actions button[aria-pressed="true"] { background: #1d5a54; border-color: #3c8d83; }
+.toolbar-actions button[aria-pressed="true"]:disabled { opacity: 1; }
 .toolbar-feedback { margin-left: auto; max-width: 25rem; }
 
 .workspace { position: relative; min-height: 0; overflow: hidden; }
