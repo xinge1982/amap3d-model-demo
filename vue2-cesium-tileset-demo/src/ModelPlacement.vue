@@ -63,7 +63,7 @@ export default {
       status: '请单击场景中的摆放位置。',
       loading: false,
       mode: 'translate',
-      coordinate: 'surface',
+      coordinate: this.initialPlacement ? 'local' : 'surface',
       enabled: true,
       modes: [
         { value: 'translate', label: '平移' },
@@ -215,7 +215,7 @@ export default {
         for (const name of CAMERA_INPUTS) resources.cameraInputs[name] = controls[name]
         gizmo.attach(resources.viewer)
         gizmo.setMode(GizmoMode.translate)
-        gizmo.coordinateMode = CoordinateMode.surface
+        gizmo.coordinateMode = CoordinateMode[this.coordinate]
         gizmo.mountToPrimitive(resources.model, resources.viewer)
         resources.localBounds = this.initialPlacement?.localBounds
         if (!resources.localBounds) {
