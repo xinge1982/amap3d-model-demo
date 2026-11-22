@@ -136,7 +136,7 @@ export default class TilesetScene {
 
     try {
       if (!runtime.tileset) {
-        layer.status = "加载中…";
+        layer.status = "正在加载图层配置…";
         runtime.pending ??= Cesium.Cesium3DTileset.fromUrl(config.url, tilesetOptions(config))
           .then((tileset) => {
             if (this.destroyed) {
@@ -152,6 +152,7 @@ export default class TilesetScene {
               console.error(config.name, message);
             });
             this.viewer.scene.primitives.add(tileset);
+            layer.tilesetReady = true;
           })
           .finally(() => { runtime.pending = undefined; });
         await runtime.pending;
@@ -159,14 +160,13 @@ export default class TilesetScene {
 
       if (this.destroyed) return;
       runtime.tileset.show = layer.enabled;
-      layer.loaded = true;
       layer.status = layer.enabled ? "已开启" : "已关闭";
       this.viewer.scene.requestRender();
     } catch (error) {
       if (this.destroyed) return;
       if (layer.enabled) {
         layer.enabled = false;
-        layer.status = "加载失败，重新勾选可重试";
+        layer.status = "图层配置加载失败，重新勾选可重试";
       }
       console.error(config.name, error);
     }
@@ -174,7 +174,7 @@ export default class TilesetScene {
 
   locate(layer) {
     const tileset = this.layers.get(layer.config.id).tileset;
-    return !this.destroyed && layer.enabled && tileset
+    return !this.destroyed && tileset
       ? this.viewer.flyTo(tileset)
       : false;
   }
@@ -188,7 +188,8 @@ export default class TilesetScene {
     ];
     for (const layer of focusOrder) {
       await tasks.get(layer);
-      if (this.destroyed || await this.locate(layer)) break;
+      if (this.destroyed) break;
+      if (layer.enabled && await this.locate(layer)) break;
     }
   }
 

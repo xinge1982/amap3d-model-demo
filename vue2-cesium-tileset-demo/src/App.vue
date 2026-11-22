@@ -16,7 +16,7 @@
           <button
             type="button"
             :aria-label="`定位${layer.config.name}`"
-            :disabled="!layer.enabled || !layer.loaded"
+            :disabled="!layer.tilesetReady"
             @click="locate(layer)"
           >定位</button>
           <small>{{ layer.status }}</small>
@@ -102,7 +102,7 @@ export default {
       this.layers = configs.map((config) => ({
         config,
         enabled: config.defaultLoad === true,
-        loaded: false,
+        tilesetReady: false,
         status: "已关闭",
       }));
       this.status = "点击场景中的单体，查看操作选项。";
