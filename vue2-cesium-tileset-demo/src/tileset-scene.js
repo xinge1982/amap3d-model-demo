@@ -13,7 +13,7 @@ function tilesetOptions(config) {
 }
 
 export default class TilesetScene {
-  constructor(container, configs, deletedIds, onPick) {
+  constructor(container, configs, deletedIds, onSceneClick) {
     this.destroyed = false;
     this.hiddenKeys = new Set(deletedIds);
     this.hiddenRevision = 0;
@@ -71,7 +71,7 @@ export default class TilesetScene {
       zoomOutTooltip: "缩小",
     });
     const handler = viewer.screenSpaceEventHandler;
-    handler.setInputAction(({ position }) => onPick(this.pick(position)), Cesium.ScreenSpaceEventType.LEFT_CLICK);
+    handler.setInputAction(({ position }) => onSceneClick(position), Cesium.ScreenSpaceEventType.LEFT_CLICK);
     handler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
   }
 
@@ -97,6 +97,16 @@ export default class TilesetScene {
     };
     update();
     return scene.postRender.addEventListener(update);
+  }
+
+  pickPlacementPosition(position, allowEllipsoid = true) {
+    const { scene, camera } = this.viewer;
+    const depthPosition = scene.pickPositionSupported ? scene.pickPosition(position) : undefined;
+    if (depthPosition) return depthPosition;
+    if (allowEllipsoid && scene.globe.show) {
+      return camera.pickEllipsoid(position, scene.globe.ellipsoid);
+    }
+    return undefined;
   }
 
   pick(position) {
