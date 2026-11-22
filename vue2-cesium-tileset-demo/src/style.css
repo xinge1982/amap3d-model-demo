@@ -108,6 +108,20 @@ button:disabled { opacity: 0.45; cursor: default; }
 
 .camera-panel dd { font-variant-numeric: tabular-nums; }
 
+.viewpoint-title { margin: 1rem 0 0.4rem; font-size: 0.85rem; }
+
+.viewpoint-json {
+  margin: 0;
+  padding: 0.65rem;
+  overflow-x: auto;
+  border: 1px solid #344956;
+  border-radius: 0.35rem;
+  background: #0c151e;
+  color: #c5e3ed;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
 .selection { right: 1rem; bottom: 2rem; }
 .selection-heading, .actions { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
 

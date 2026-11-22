@@ -57,6 +57,8 @@
             <dd :key="field.label">{{ field.value }}</dd>
           </template>
         </dl>
+        <h3 v-if="viewPointJson" id="viewpoint-title" class="viewpoint-title">viewPoint 配置</h3>
+        <pre v-if="viewPointJson" class="viewpoint-json" aria-labelledby="viewpoint-title" tabindex="0"><code>{{ viewPointJson }}</code></pre>
       </aside>
 
       <section v-if="selected" class="panel selection" aria-labelledby="selection-title">
@@ -91,6 +93,15 @@ import { hideFeature, loadTilesetConfig } from "./api";
 import ModelPicker from "./ModelPicker.vue";
 import TilesetScene from "./tileset-scene";
 
+const CAMERA_FIELDS = [
+  { key: "lon", label: "经度", decimals: 8, unit: "°" },
+  { key: "lat", label: "纬度", decimals: 8, unit: "°" },
+  { key: "height", label: "高度", decimals: 3, unit: " m" },
+  { key: "heading", label: "航向角", decimals: 3, unit: "°" },
+  { key: "pitch", label: "俯仰角", decimals: 3, unit: "°" },
+  { key: "roll", label: "横滚角", decimals: 3, unit: "°" },
+];
+
 export default {
   components: { ModelPicker },
   data() {
@@ -100,7 +111,7 @@ export default {
       sceneReady: false,
       globeVisible: true,
       cameraOpen: false,
-      cameraParameters: [],
+      cameraViewPoint: undefined,
       status: "正在读取图层配置…",
       canRetry: false,
       selected: undefined,
@@ -109,6 +120,23 @@ export default {
       libraryModel: undefined,
       selectionError: "",
     };
+  },
+  computed: {
+    cameraParameters() {
+      if (!this.cameraViewPoint) return [];
+      return CAMERA_FIELDS.map(({ key, label, decimals, unit }) => ({
+        label,
+        value: this.cameraViewPoint[key].toFixed(decimals) + unit,
+      }));
+    },
+    viewPointJson() {
+      if (!this.cameraViewPoint) return "";
+      const viewPoint = {};
+      for (const { key, decimals } of CAMERA_FIELDS) {
+        viewPoint[key] = Number(this.cameraViewPoint[key].toFixed(decimals));
+      }
+      return JSON.stringify({ viewPoint }, null, 2);
+    },
   },
   created() {
     // Viewer 和瓦片对象由场景实例持有，避免 Vue 2 深度观察。
@@ -170,14 +198,7 @@ export default {
       this.cameraOpen = !this.cameraOpen;
       if (this.cameraOpen) {
         this.stopCameraUpdates = this.sceneController.watchCamera((camera) => {
-          this.cameraParameters = [
-            { label: "经度", value: `${camera.lon.toFixed(8)}°` },
-            { label: "纬度", value: `${camera.lat.toFixed(8)}°` },
-            { label: "高度", value: `${camera.height.toFixed(3)} m` },
-            { label: "航向角", value: `${camera.heading.toFixed(3)}°` },
-            { label: "俯仰角", value: `${camera.pitch.toFixed(3)}°` },
-            { label: "横滚角", value: `${camera.roll.toFixed(3)}°` },
-          ];
+          this.cameraViewPoint = camera;
         });
       } else {
         this.stopCameraUpdates();
