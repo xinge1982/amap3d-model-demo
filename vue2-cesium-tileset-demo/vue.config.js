@@ -3,6 +3,7 @@ const createMockApi = require("./mock/api");
 module.exports = {
   publicPath: "./",
   productionSourceMap: false,
+  transpileDependencies: ["cesium-transform-controls"],
   configureWebpack: {
     externals: { cesium: "Cesium" },
   },
