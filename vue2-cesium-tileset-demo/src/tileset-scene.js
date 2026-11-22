@@ -7,6 +7,15 @@ const dynamicStyles = {
   selected: new Cesium.Cesium3DTileStyle({ color: "color('yellow')" }),
 };
 
+const lighterFragmentShader = `
+  void fragmentMain(FragmentInput fsInput, inout czm_modelMaterial material) {
+    vec3 base = material.diffuse;
+    material.diffuse = base * 1.3;
+    material.emissive = base * 0.7;
+    material.alpha = 1.0;
+  }
+`;
+
 function dynamicContentId(content) {
   return normalizeFeatureId(content?.metadata?.getProperty("id"));
 }
@@ -255,6 +264,10 @@ export default class TilesetScene {
               tileset.destroy();
               return;
             }
+            if (config.id === DYNAMIC_TILESET_ID) {
+              this.lighterCustomShader ??= new Cesium.CustomShader({ fragmentShaderText: lighterFragmentShader });
+              tileset.customShader = this.lighterCustomShader;
+            }
             this.layersByTileset.set(tileset, config);
             tileset.show = layer.enabled;
             tileset.tileVisible.addEventListener(({ content }) => this.updateTileContent(content, config));
@@ -337,5 +350,6 @@ export default class TilesetScene {
     this.destroyed = true;
     this.navigation.destroy();
     this.viewer.destroy();
+    this.lighterCustomShader?.destroy();
   }
 }
