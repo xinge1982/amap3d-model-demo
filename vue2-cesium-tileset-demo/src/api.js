@@ -27,11 +27,11 @@ export function hideFeature(tilesetId, featureId, action, modelId) {
 }
 
 export function savePlacement(placement, replacement) {
-  const { placementId, modelId, modelMatrix, localBounds } = placement;
+  const { placementId, modelId, modelMatrix, localBounds, frontTexture } = placement;
   return request("/api/tilesets/placements", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ placementId, modelId, modelMatrix, localBounds, replacement }),
+    body: JSON.stringify({ placementId, modelId, modelMatrix, localBounds, replacement, frontTexture }),
   });
 }
 
@@ -39,10 +39,10 @@ export function loadPlacement(featureId) {
   return request(`/api/tilesets/placements/${encodeURIComponent(featureId)}`);
 }
 
-export function movePlacement(featureId, modelMatrix) {
+export function movePlacement(featureId, modelMatrix, frontTexture) {
   return request(`/api/tilesets/placements/${encodeURIComponent(featureId)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ modelMatrix }),
+    body: JSON.stringify({ modelMatrix, frontTexture }),
   });
 }

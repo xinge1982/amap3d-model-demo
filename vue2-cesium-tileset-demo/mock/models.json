@@ -40,5 +40,13 @@
     "subcategory": "指路标志",
     "name": "路侧指路牌",
     "url": "/api/models/files/sign-01.glb"
+  },
+  {
+    "id": "sign-rect",
+    "category": "标志牌",
+    "subcategory": "指路标志",
+    "name": "矩形标志牌",
+    "url": "/api/models/files/Rect.gltf",
+    "frontMaterial": "Textureface.png"
   }
 ]

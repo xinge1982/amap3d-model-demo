@@ -324,7 +324,9 @@ export default {
       try {
         const record = await loadPlacement(source.id);
         if (this.disposed) return;
-        this.beginPlacement({ id: record.modelId, name: record.modelName, url: record.url }, source, record);
+        this.beginPlacement({
+          id: record.modelId, name: record.modelName, url: record.url, frontMaterial: record.frontMaterial,
+        }, source, record);
       } catch (error) {
         if (!this.disposed) this.selectionError = error.message;
       } finally {
@@ -389,7 +391,7 @@ export default {
       this.placementError = "";
       try {
         if (initialPlacement) {
-          await movePlacement(source.id, placedModel.modelMatrix);
+          await movePlacement(source.id, placedModel.modelMatrix, placedModel.frontTexture);
         } else {
           await savePlacement(placedModel, source
             ? { tilesetId: source.layerId, featureId: source.id }

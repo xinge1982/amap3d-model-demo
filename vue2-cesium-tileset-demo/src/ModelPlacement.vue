@@ -7,7 +7,14 @@
     <p class="intro">{{ item.name }}</p>
     <p class="status" :class="{ error: saveError || error }" role="status">{{ saveError || error || (saving ? '正在保存摆放…' : status) }}</p>
     <button v-if="error && !loading && (anchor || initialPlacement)" type="button" @click="loadInitialModel">重试加载模型</button>
-    <fieldset :disabled="!ready || saving">
+    <div v-if="item.frontMaterial" class="front-texture">
+      <p class="field-label">标志牌正面贴图</p>
+      <input ref="frontImage" type="file" :accept="frontTextureAccept" hidden @change="uploadFrontTexture">
+      <button type="button" :disabled="!ready || busy" @click="$refs.frontImage.click()">上传正面图片</button>
+      <p v-if="textureError" class="status error" role="alert">{{ textureError }}</p>
+      <img v-if="frontTexture" :src="frontTexture" alt="标志牌正面贴图预览">
+    </div>
+    <fieldset :disabled="!ready || busy">
       <p class="field-label">变换模式</p>
       <div class="row">
         <button v-for="item in modes" :key="item.value" type="button"
@@ -38,11 +45,21 @@
 <script>
 import * as Cesium from 'cesium'
 import { Gizmo, GizmoMode, CoordinateMode } from 'cesium-transform-controls'
+import { FRONT_TEXTURE_MAX_BYTES, FRONT_TEXTURE_TYPES, applyFrontTexture } from './front-texture'
 
 const CAMERA_INPUTS = [
   'enableRotate', 'enableTranslate', 'enableZoom', 'enableTilt', 'enableLook',
   'rotateEventTypes', 'tiltEventTypes', 'zoomEventTypes',
 ]
+
+function readImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
+}
 
 export default {
   name: 'ModelPlacement',
@@ -62,6 +79,10 @@ export default {
       error: '',
       status: '请单击场景中的摆放位置。',
       loading: false,
+      updatingTexture: false,
+      textureError: '',
+      frontTexture: this.initialPlacement?.frontTexture,
+      frontTextureAccept: FRONT_TEXTURE_TYPES.join(','),
       mode: 'translate',
       coordinate: this.initialPlacement ? 'local' : 'surface',
       enabled: true,
@@ -74,8 +95,14 @@ export default {
     }
   },
 
+  computed: {
+    busy() {
+      return this.saving || this.updatingTexture
+    },
+  },
+
   watch: {
-    saving(value) {
+    busy(value) {
       this._resources.gizmo?.setEnabled(!value && this.enabled)
     },
   },
@@ -107,6 +134,7 @@ export default {
 
     releaseModel() {
       const resources = this._resources
+      this.discardPendingModel()
       resources.removeReady?.()
       resources.removeError?.()
       resources.removeReady = null
@@ -155,22 +183,13 @@ export default {
       const { viewer } = resources
       try {
         resources.originalMatrix = Cesium.Matrix4.clone(modelMatrix)
-        const model = await Cesium.Model.fromGltfAsync({
-          url: this.item.url,
-          modelMatrix,
-          minimumPixelSize: 0,
-        })
+        const model = await this.createPreviewModel(modelMatrix, this.frontTexture)
         if (resources.disposed) {
           model.destroy()
           return
         }
         resources.model = viewer.scene.primitives.add(model)
-        resources.removeError = model.errorEvent.addEventListener((error) => {
-          // Cesium 可能在遍历图元时触发错误，下一轮再移除模型。
-          Promise.resolve().then(() => {
-            if (resources.model === model) this.handleError(error)
-          })
-        })
+        this.watchModelError(model)
         if (model.ready) this.setupGizmo()
         else resources.removeReady = model.readyEvent.addEventListener(this.setupGizmo)
         viewer.scene.requestRender()
@@ -179,11 +198,120 @@ export default {
       }
     },
 
+    async createPreviewModel(modelMatrix, frontTexture, show = true) {
+      const options = { modelMatrix, minimumPixelSize: 0, show }
+      if (!frontTexture) return Cesium.Model.fromGltfAsync({ ...options, url: this.item.url })
+
+      const response = await fetch(this.item.url)
+      if (!response.ok) throw new Error(`读取标志牌模型失败（HTTP ${response.status}）。`)
+      const gltf = applyFrontTexture(await response.json(), this.item.frontMaterial, frontTexture)
+      // 独立缓存键避免 Cesium 复用原始 glTF，仍相对于原文件解析依赖。
+      const basePath = new Cesium.Resource({
+        url: response.url || this.item.url,
+        queryParameters: { preview: Cesium.createGuid() },
+      })
+      return Cesium.Model.fromGltfAsync({ ...options, gltf, basePath, incrementallyLoadTextures: false })
+    },
+
+    watchModelError(model) {
+      const resources = this._resources
+      resources.removeError = model.errorEvent.addEventListener((error) => {
+        // Cesium 可能在遍历图元时触发错误，下一轮再移除模型。
+        Promise.resolve().then(() => {
+          if (resources.model === model) this.handleError(error)
+        })
+      })
+    },
+
+    async uploadFrontTexture(event) {
+      const [file] = event.target.files
+      event.target.value = ''
+      if (!file || !this.ready || this.busy) return
+
+      this.textureError = ''
+      if (!FRONT_TEXTURE_TYPES.includes(file.type) || file.size > FRONT_TEXTURE_MAX_BYTES) {
+        this.textureError = '请选择不超过 4 MB 的 PNG 或 JPEG 图片。'
+        return
+      }
+
+      const resources = this._resources
+      const { viewer } = resources
+      this.updatingTexture = true
+      this.status = '正在更新正面贴图…'
+      try {
+        const texture = await readImage(file)
+        if (resources.disposed || !resources.model) return
+        const matrix = Cesium.Matrix4.clone(resources.model.modelMatrix)
+        const model = await this.createPreviewModel(matrix, texture, false)
+        if (resources.disposed || !resources.model) {
+          model.destroy()
+          return
+        }
+        // 等新贴图和图元就绪再替换，加载失败时继续显示原模型。
+        const pending = { model: viewer.scene.primitives.add(model) }
+        resources.pendingModel = pending
+        pending.stopError = model.errorEvent.addEventListener((error) => {
+          Promise.resolve().then(() => {
+            if (resources.pendingModel === pending) this.handleTextureError(error)
+          })
+        })
+        if (model.ready) this.showTexturedModel(texture)
+        else pending.stopReady = model.readyEvent.addEventListener(() => this.showTexturedModel(texture))
+        viewer.scene.requestRender()
+      } catch (error) {
+        if (!resources.disposed && resources.model) this.handleTextureError(error)
+      }
+    },
+
+    showTexturedModel(texture) {
+      const resources = this._resources
+      const { model, gizmo, viewer, pendingModel } = resources
+      const next = pendingModel.model
+      try {
+        gizmo.mountToPrimitive(next, viewer)
+      } catch (error) {
+        this.handleTextureError(error)
+        return
+      }
+
+      pendingModel.stopReady?.()
+      pendingModel.stopError()
+      resources.pendingModel = null
+      resources.removeError()
+      resources.model = next
+      this.watchModelError(next)
+      next.show = true
+      viewer.scene.primitives.remove(model)
+      this.frontTexture = texture
+      this.updatingTexture = false
+      this.status = '正面贴图已更新'
+      viewer.scene.requestRender()
+    },
+
+    discardPendingModel() {
+      const resources = this._resources
+      const { pendingModel, viewer } = resources
+      if (!pendingModel) return
+      pendingModel.stopReady?.()
+      pendingModel.stopError?.()
+      resources.pendingModel = null
+      viewer.scene.primitives.remove(pendingModel.model)
+      viewer.scene.requestRender()
+    },
+
+    handleTextureError(error) {
+      this.discardPendingModel()
+      this.updatingTexture = false
+      this.status = '模型已就绪'
+      this.textureError = '正面贴图更新失败。' + (error.message || String(error)).slice(0, 240)
+    },
+
     handleError(error) {
       this.releaseModel()
       this.loading = false
+      this.updatingTexture = false
       this.ready = false
-      this.error = '模型加载或初始化失败。' + (error.message || String(error))
+      this.error = '模型加载或初始化失败。' + (error.message || String(error)).slice(0, 240)
       this.$emit('load-error')
     },
 
@@ -306,12 +434,13 @@ export default {
     // 预览保留到保存成功。重试同一摆放时复用 ID。
     confirmPlacement() {
       const resources = this._resources
-      if (!this.ready || this.saving || resources.disposed) return
+      if (!this.ready || this.busy || resources.disposed) return
       this.$emit('confirm', {
         placementId: resources.placementId,
         modelId: this.item.id,
         modelMatrix: Cesium.Matrix4.toArray(resources.model.modelMatrix),
         localBounds: resources.localBounds,
+        frontTexture: this.frontTexture,
       })
     },
   },
@@ -340,6 +469,7 @@ select { width: 100%; padding: 0.4rem; border: 1px solid #567086; border-radius:
 .values div { display: flex; justify-content: space-between; gap: 0.5rem; padding: 0.5rem 0; border-bottom: 1px solid #ffffff16; font-size: 0.8rem; }
 .values span { color: #a8bdcd; }
 .values strong { font-variant-numeric: tabular-nums; font-weight: 500; }
+.front-texture img { display: block; max-width: 100%; max-height: 8rem; margin-top: 0.5rem; }
 .actions, .confirm { margin-top: 0.75rem; }
 .confirm { width: 100%; }
 .hint { margin-bottom: 0; }

@@ -46,7 +46,7 @@ function buildDynamicTileset(records) {
       geometricError: 0,
       transform: Matrix4.toArray(tileMatrix),
       content: {
-        uri: record.url,
+        uri: record.frontTexture ? `/api/models/files/placement-${encodeURIComponent(record.featureId)}.gltf` : record.url,
         metadata: { class: "placedModel", properties: { id: record.featureId } },
       },
     });
