@@ -19,7 +19,7 @@
           class="place-model-button"
           type="button"
           :aria-pressed="String(placementActive)"
-          :disabled="!sceneReady || saving || Boolean(placement)"
+          :disabled="!sceneReady || saving || reloading || Boolean(placement)"
           @click="openModelPicker('place')"
         >
           摆放模型
@@ -28,7 +28,7 @@
       <div class="toolbar-feedback">
         <p id="status" role="status">{{ status }}</p>
         <button v-if="canRetry" id="retry-start" type="button" @click="start">重新读取配置</button>
-        <button v-if="canRetryDynamic" type="button" :disabled="saving" @click="retryDynamic">刷新动态模型</button>
+        <button v-if="canRetryDynamic" type="button" :disabled="saving || reloading" @click="retryDynamic">刷新动态模型</button>
       </div>
     </header>
 
@@ -37,18 +37,19 @@
 
       <aside v-show="layersOpen && !placement" id="layers-panel" class="panel layers" aria-labelledby="layers-title">
         <h2 id="layers-title">场景图层</h2>
-        <button class="model-library-button" type="button" :disabled="saving" @click="openModelPicker('browse')">模型库</button>
-        <p v-if="libraryModel" class="library-choice">已选模型：{{ libraryModel.name }}</p>
+        <button class="reload-tilesets-button" type="button" :disabled="!sceneReady || saving || reloading" @click="reloadAllLayers">
+          {{ reloading ? "正在重新加载…" : "重新加载所有 Tileset" }}
+        </button>
         <ul id="layer-list" aria-label="场景图层">
           <li v-for="layer in layers" :key="layer.config.id" class="layer">
             <label>
-              <input v-model="layer.enabled" type="checkbox" @change="updateLayer(layer)">
+              <input v-model="layer.enabled" type="checkbox" :disabled="reloading" @change="updateLayer(layer)">
               {{ layer.config.name }}
             </label>
             <button
               type="button"
               :aria-label="`定位${layer.config.name}`"
-              :disabled="!layer.tilesetReady"
+              :disabled="!layer.tilesetReady || reloading"
               @click="locate(layer)"
             >定位</button>
             <small>{{ layer.status }}</small>
@@ -132,6 +133,7 @@ export default {
     return {
       layers: [],
       layersOpen: false,
+      reloading: false,
       sceneReady: false,
       globeVisible: true,
       cameraOpen: false,
@@ -144,17 +146,15 @@ export default {
       modelPickerMode: "",
       placement: null,
       placementError: "",
-      libraryModel: undefined,
       selectionError: "",
     };
   },
   computed: {
     placementActive() {
-      return Boolean(this.placement) || this.modelPickerMode === "place" || this.modelPickerMode === "replace";
+      return Boolean(this.placement || this.modelPickerMode);
     },
     modelPickerTitle() {
-      if (this.modelPickerMode === "replace") return "选择替换模型";
-      return this.modelPickerMode === "place" ? "选择摆放模型" : "模型库";
+      return this.modelPickerMode === "replace" ? "选择替换模型" : "选择摆放模型";
     },
     cameraParameters() {
       if (!this.cameraViewPoint) return [];
@@ -241,6 +241,24 @@ export default {
       }
     },
 
+    async reloadAllLayers() {
+      if (!this.sceneReady || this.saving || this.reloading || this.placementActive) return;
+      this.reloading = true;
+      this.selectFeature();
+      this.status = "正在重新加载所有 Tileset…";
+
+      try {
+        const results = await Promise.all(this.layers.map((layer) => this.sceneController.reloadLayer(layer)));
+        if (this.disposed) return;
+        const failed = results.filter((loaded) => !loaded).length;
+        const dynamicIndex = this.layers.findIndex(({ config }) => config.id === DYNAMIC_TILESET_ID);
+        if (results[dynamicIndex]) this.canRetryDynamic = false;
+        this.status = failed ? `${failed} 个图层重载失败，可再次点击重载。` : "所有 Tileset 已重新加载。";
+      } finally {
+        if (!this.disposed) this.reloading = false;
+      }
+    },
+
     updateLayer(layer) {
       if (!layer.enabled && this.selected?.layerId === layer.config.id && !this.saving) {
         this.selectFeature();
@@ -253,7 +271,7 @@ export default {
     },
 
     onSceneClick(position) {
-      if (this.saving || this.modelPickerMode) return;
+      if (this.saving || this.reloading || this.modelPickerMode) return;
       if (this.placement) {
         this.$refs.placement?.pickAnchor(position);
         return;
@@ -284,11 +302,6 @@ export default {
     confirmModel(model) {
       const mode = this.modelPickerMode;
       this.modelPickerMode = "";
-      if (mode === "browse") {
-        this.libraryModel = model;
-        return;
-      }
-
       const replacement = mode === "replace" ? this.selected : null;
       const anchor = replacement ? this.selectedAnchor ?? null : null;
       // 预览期间清除原单体高亮，取消后再恢复选择。
