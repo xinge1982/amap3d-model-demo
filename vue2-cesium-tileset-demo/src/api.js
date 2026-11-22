@@ -34,3 +34,15 @@ export function savePlacement(placement, replacement) {
     body: JSON.stringify({ placementId, modelId, modelMatrix, localBounds, replacement }),
   });
 }
+
+export function loadPlacement(featureId) {
+  return request(`/api/tilesets/placements/${encodeURIComponent(featureId)}`);
+}
+
+export function movePlacement(featureId, modelMatrix) {
+  return request(`/api/tilesets/placements/${encodeURIComponent(featureId)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ modelMatrix }),
+  });
+}

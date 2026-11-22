@@ -25,6 +25,7 @@ export default class TilesetScene {
   constructor(container, configs, deletedIds, onSceneClick) {
     this.destroyed = false;
     this.hiddenKeys = new Set(deletedIds);
+    this.temporaryHiddenKeys = new Set();
     this.hiddenRevision = 0;
     this.selectedKey = undefined;
     this.contentStates = new WeakMap();
@@ -130,7 +131,7 @@ export default class TilesetScene {
       : readFeatureId(feature);
     if (id === undefined) return { missingId: true };
     const key = featureKey(config.id, id);
-    if (this.hiddenKeys.has(key)) return undefined;
+    if (this.isHidden(key)) return undefined;
     return { layerId: config.id, layerName: config.name, id, key };
   }
 
@@ -141,6 +142,18 @@ export default class TilesetScene {
 
   hide(key) {
     this.hiddenKeys.add(key);
+    this.hiddenRevision++;
+    this.viewer.scene.requestRender();
+  }
+
+  isHidden(key) {
+    return this.hiddenKeys.has(key) || this.temporaryHiddenKeys.has(key);
+  }
+
+  setTemporaryHidden(key, hidden) {
+    if (hidden === this.temporaryHiddenKeys.has(key)) return;
+    if (hidden) this.temporaryHiddenKeys.add(key);
+    else this.temporaryHiddenKeys.delete(key);
     this.hiddenRevision++;
     this.viewer.scene.requestRender();
   }
@@ -156,7 +169,9 @@ export default class TilesetScene {
       if (!featuresByKey.has(key)) featuresByKey.set(key, []);
       featuresByKey.get(key).push(feature);
     }
-    const state = { featuresByKey, hiddenRevision: -1, selectedKey: undefined, highlights: [] };
+    const state = {
+      featuresByKey, hiddenRevision: -1, selectedKey: undefined, highlights: [], visibilityBeforeHide: new Map(),
+    };
     this.contentStates.set(content, state);
     return state;
   }
@@ -174,8 +189,17 @@ export default class TilesetScene {
     const state = this.contentStates.get(content) ?? this.indexContent(content, config);
     if (state.hiddenRevision !== this.hiddenRevision) {
       for (const [key, features] of state.featuresByKey) {
-        if (!this.hiddenKeys.has(key)) continue;
-        for (const feature of features) feature.show = false;
+        const hidden = this.isHidden(key);
+        for (const feature of features) {
+          const original = state.visibilityBeforeHide;
+          if (hidden) {
+            if (!original.has(feature)) original.set(feature, feature.show);
+            feature.show = false;
+          } else if (original.has(feature)) {
+            feature.show = original.get(feature);
+            original.delete(feature);
+          }
+        }
       }
       state.hiddenRevision = this.hiddenRevision;
     }
@@ -196,7 +220,7 @@ export default class TilesetScene {
     const id = dynamicContentId(content);
     if (id === undefined) return;
     const key = featureKey(DYNAMIC_TILESET_ID, id);
-    const style = this.hiddenKeys.has(key) ? dynamicStyles.hidden
+    const style = this.isHidden(key) ? dynamicStyles.hidden
       : key === this.selectedKey ? dynamicStyles.selected : undefined;
     if (!this.contentStates.has(content) || this.contentStates.get(content) !== style) {
       content.applyStyle(style);

@@ -138,6 +138,7 @@ button:disabled { opacity: 0.45; cursor: default; }
 dt { color: #a8bdcd; }
 dd { margin: 0; overflow-wrap: anywhere; }
 .actions { justify-content: flex-end; margin-top: 0.85rem; }
+.selection .actions { flex-wrap: wrap; }
 .primary { background: #1d5a54; border-color: #3c8d83; }
 .danger { background: #702d3c; border-color: #aa5967; }
 #selection-error { color: #ffc0c7; }

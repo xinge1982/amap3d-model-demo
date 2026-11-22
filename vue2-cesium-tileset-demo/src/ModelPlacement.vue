@@ -1,11 +1,12 @@
 <template>
   <section class="panel placement-panel" aria-labelledby="placement-title">
     <header class="selection-heading">
-      <h2 id="placement-title">摆放模型</h2>
+      <h2 id="placement-title">{{ initialPlacement ? '移动模型' : '摆放模型' }}</h2>
       <button type="button" :disabled="saving" @click="$emit('cancel')">取消</button>
     </header>
     <p class="intro">{{ item.name }}</p>
     <p class="status" :class="{ error: saveError || error }" role="status">{{ saveError || error || (saving ? '正在保存摆放…' : status) }}</p>
+    <button v-if="error && !loading && (anchor || initialPlacement)" type="button" @click="loadInitialModel">重试加载模型</button>
     <fieldset :disabled="!ready || saving">
       <p class="field-label">变换模式</p>
       <div class="row">
@@ -28,7 +29,7 @@
         <button type="button" @click="resetModel">重置模型</button>
         <button type="button" @click="locateModel">定位模型</button>
       </div>
-      <button class="confirm primary" type="button" @click="confirmPlacement">确定摆放</button>
+      <button class="confirm primary" type="button" @click="confirmPlacement">{{ initialPlacement ? '确定移动' : '确定摆放' }}</button>
     </fieldset>
     <p class="hint">红 X、绿 Y、蓝 Z。用左键拖动坐标轴或平面。</p>
   </section>
@@ -50,6 +51,7 @@ export default {
     sceneController: { type: Object, required: true },
     item: { type: Object, required: true },
     anchor: { type: Object, default: null },
+    initialPlacement: { type: Object, default: null },
     saving: { type: Boolean, default: false },
     saveError: { type: String, default: '' },
   },
@@ -87,7 +89,7 @@ export default {
   },
 
   mounted() {
-    if (this.anchor) this.placeAt(this.anchor)
+    this.loadInitialModel()
   },
 
   beforeDestroy() {
@@ -122,24 +124,36 @@ export default {
     },
 
     pickAnchor(position) {
-      if (this.loading || this.ready) return
+      if (this.initialPlacement || this.loading || this.ready) return
       this.placeAt(this.sceneController.pickPlacementPosition(position))
     },
 
-    async placeAt(position) {
-      const resources = this._resources
-      if (this.loading || this.ready || resources.disposed) return
+    loadInitialModel() {
+      if (this.initialPlacement) {
+        return this.loadModel(Cesium.Matrix4.fromArray(this.initialPlacement.modelMatrix))
+      }
+      if (this.anchor) return this.placeAt(this.anchor)
+    },
+
+    placeAt(position) {
       if (!position) {
         this.error = '无法获取落点，请单击可见模型或地球表面。'
         return
       }
 
+      return this.loadModel(Cesium.Transforms.eastNorthUpToFixedFrame(position))
+    },
+
+    async loadModel(modelMatrix) {
+      const resources = this._resources
+      if (this.loading || this.ready || resources.disposed) return
+
+      this.$emit('load-model')
       this.error = ''
       this.status = '正在加载模型…'
       this.loading = true
       const { viewer } = resources
       try {
-        const modelMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(position)
         resources.originalMatrix = Cesium.Matrix4.clone(modelMatrix)
         const model = await Cesium.Model.fromGltfAsync({
           url: this.item.url,
@@ -169,7 +183,8 @@ export default {
       this.releaseModel()
       this.loading = false
       this.ready = false
-      this.error = '模型加载或初始化失败，请重新选择落点。' + (error.message || String(error))
+      this.error = '模型加载或初始化失败。' + (error.message || String(error))
+      this.$emit('load-error')
     },
 
     // 只创建一个 Gizmo，显式绑定本次摆放的完整模型。
@@ -202,15 +217,18 @@ export default {
         gizmo.setMode(GizmoMode.translate)
         gizmo.coordinateMode = CoordinateMode.surface
         gizmo.mountToPrimitive(resources.model, resources.viewer)
-        const initialBounds = resources.model.boundingSphere
-        const worldToLocal = Cesium.Matrix4.inverseTransformation(resources.originalMatrix, new Cesium.Matrix4())
-        const center = Cesium.Matrix4.multiplyByPoint(worldToLocal, initialBounds.center, new Cesium.Cartesian3())
-        resources.localBounds = [...Cesium.Cartesian3.pack(center, []), initialBounds.radius]
+        resources.localBounds = this.initialPlacement?.localBounds
+        if (!resources.localBounds) {
+          const initialBounds = resources.model.boundingSphere
+          const worldToLocal = Cesium.Matrix4.inverseTransformation(resources.originalMatrix, new Cesium.Matrix4())
+          const center = Cesium.Matrix4.multiplyByPoint(worldToLocal, initialBounds.center, new Cesium.Cartesian3())
+          resources.localBounds = [...Cesium.Cartesian3.pack(center, []), initialBounds.radius]
+        }
         this.ready = true
         this.loading = false
         this.status = '模型已就绪'
         this.updatePosition()
-        this.locateModel()
+        if (!this.initialPlacement) this.locateModel()
       } catch (error) {
         this.handleError(error)
       }

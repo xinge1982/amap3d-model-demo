@@ -1,6 +1,6 @@
 # Vue2 Cesium Tileset 单体演示
 
-使用 Vue 2.7.16、Vue CLI 4.5.19（Webpack 4）和 Cesium 1.136.0 加载 3D Tiles。支持图层开关、定位、单体拾取高亮、删除和标记替换。标记替换会记录操作并隐藏原单体，新模型的上传和摆放留待后续实现。
+使用 Vue 2.7.16、Vue CLI 4.5.19（Webpack 4）和 Cesium 1.136.0 加载 3D Tiles。支持图层开关、定位、单体拾取高亮、删除、替换和移动动态模型。
 
 ## 启动
 
@@ -37,6 +37,8 @@ npm run serve
 | `GET /api/tileset/deleted` | 同一隐藏列表的兼容路径 |
 | `DELETE /api/tilesets/feature` | 接收下方 JSON 并返回包含组合 `id` 的保存记录 |
 | `POST /api/tilesets/placements` | 保存摆放。接收 `placementId`（UUID）、`modelId`、`modelMatrix`（列主序 ECEF）和 `localBounds`（局部包围球四个数），替换时另传 `replacement: { tilesetId, featureId }` |
+| `GET /api/tilesets/placements/:featureId` | 读取动态单体保存的 GLB 地址、变换矩阵和局部包围球 |
+| `PUT /api/tilesets/placements/:featureId` | 接收 `modelMatrix`，更新同一动态单体的变换 |
 | `GET /api/tilesets/dynamic` | 返回 3D Tiles 1.1，按摆放记录引用模型库 GLB，单体 ID 写在 `content.metadata.properties.id` |
 
 ```json
@@ -87,4 +89,6 @@ npm start
 
 - 点击工具栏「摆放模型」，从模型库选择 GLB，再单击场景落点。进入替换时优先使用选中原单体的点击位置，深度不可用时可重新选择落点。
 - 左侧面板沿用 Gizmo 演示中的平移、旋转、缩放、地表/模型坐标系、位置和缩放信息，以及重置和定位按钮。
-- 点击「确定摆放」后，服务保存摆放记录。页面移除编辑预览并重新加载「动态模型」图层。动态单体可继续选中、替换或删除。启动时自动加载该图层。
+- 选中动态单体后，点击「移动模型」，使用已保存的位置、角度和缩放进入 Gizmo 编辑。确认后沿用原单体 ID 更新变换。
+- 替换或移动时，场景会临时隐藏原单体。取消或模型加载失败时恢复显示，确认替换后原单体保留为隐藏记录。
+- 确认后，页面移除编辑预览并重新加载「动态模型」图层。启动时自动加载该图层。

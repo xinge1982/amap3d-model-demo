@@ -94,6 +94,27 @@ function createMockApi() {
     res.json([...records.values()].filter(({ deleted }) => deleted).map(({ id }) => id));
   });
 
+  router.get("/tilesets/placements/:featureId", (req, res) => {
+    const record = records.get(featureKey(DYNAMIC_TILESET_ID, req.params.featureId));
+    if (!record || record.deleted) return res.status(404).json({ message: "动态单体不存在或已隐藏。" });
+    res.json({ ...record, modelName: modelCatalog.get(record.modelId)?.name ?? record.modelId });
+  });
+
+  router.put("/tilesets/placements/:featureId", (req, res) => {
+    const id = featureKey(DYNAMIC_TILESET_ID, req.params.featureId);
+    const previous = records.get(id);
+    if (!previous || previous.deleted) return res.status(404).json({ message: "动态单体不存在或已隐藏。" });
+
+    const { modelMatrix } = req.body ?? {};
+    if (!isPlacementMatrix(modelMatrix)) {
+      return res.status(400).json({ message: "模型变换矩阵无效。" });
+    }
+
+    const record = { ...previous, modelMatrix };
+    if (!commitRecords(new Map(records).set(id, record), res)) return;
+    res.json(record);
+  });
+
   router.post("/tilesets/placements", (req, res) => {
     const { placementId, modelId, modelMatrix, localBounds, replacement } = req.body ?? {};
     const model = modelCatalog.get(modelId);
