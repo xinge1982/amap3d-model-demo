@@ -208,14 +208,14 @@ export default class TilesetScene {
     const runtime = this.layers.get(layer.config.id);
     // 若首次加载尚未完成，等它退出后再取写入后的新版本。
     await runtime.pending?.catch(() => {});
-    if (this.destroyed || !layer.enabled) return false;
+    if (this.destroyed) return false;
     return this.updateLayer(layer, true);
   }
 
   async updateLayer(layer, reload = false) {
     const { config } = layer;
     const runtime = this.layers.get(config.id);
-    if (!layer.enabled) {
+    if (!layer.enabled && !reload) {
       if (runtime.tileset) runtime.tileset.show = false;
       layer.status = "已关闭";
       this.viewer.scene.requestRender();
@@ -255,8 +255,10 @@ export default class TilesetScene {
       return true;
     } catch (error) {
       if (this.destroyed) return;
-      if (layer.enabled) {
-        if (!reload) layer.enabled = false;
+      if (reload) {
+        layer.status = "图层重载失败";
+      } else if (layer.enabled) {
+        layer.enabled = false;
         layer.status = "图层配置加载失败，重新勾选可重试";
       }
       console.error(config.name, error);

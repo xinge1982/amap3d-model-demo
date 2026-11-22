@@ -149,8 +149,7 @@ dd { margin: 0; overflow-wrap: anywhere; }
   .selection { bottom: 1.75rem; }
 }
 
-.model-library-button { margin-top: 0.85rem; }
-.library-choice { margin: 0.6rem 0 0; color: #bfd0db; font-size: 0.85rem; overflow-wrap: anywhere; }
+.reload-tilesets-button { margin-top: 0.85rem; }
 
 #scene .cesium-widget-cesiumNavigationContainer .compass {
   top: 1rem;
