@@ -1,6 +1,15 @@
 import * as Cesium from "cesium";
 import CesiumNavigation from "cesium-navigation-es6";
-import { featureKey, normalizeFeatureId, readFeatureId } from "./feature-id";
+import { DYNAMIC_TILESET_ID, featureKey, normalizeFeatureId, readFeatureId } from "./feature-id";
+
+const dynamicStyles = {
+  hidden: new Cesium.Cesium3DTileStyle({ show: false }),
+  selected: new Cesium.Cesium3DTileStyle({ color: "color('yellow')" }),
+};
+
+function dynamicContentId(content) {
+  return normalizeFeatureId(content?.metadata?.getProperty("id"));
+}
 
 function tilesetOptions(config) {
   const options = { ...config.options };
@@ -111,11 +120,14 @@ export default class TilesetScene {
 
   pick(position) {
     const feature = this.viewer.scene.pick(position);
+    const content = feature?.content ?? feature?.primitive?.content;
     const config = this.layersByFeature.get(feature) ??
-      this.layersByTileset.get(feature?.tileset ?? feature?.content?.tileset ?? feature?.primitive);
+      this.layersByTileset.get(feature?.tileset ?? content?.tileset ?? feature?.primitive);
     if (!config) return undefined;
 
-    const id = readFeatureId(feature);
+    const id = config.id === DYNAMIC_TILESET_ID
+      ? dynamicContentId(content)
+      : readFeatureId(feature);
     if (id === undefined) return { missingId: true };
     const key = featureKey(config.id, id);
     if (this.hiddenKeys.has(key)) return undefined;
@@ -152,6 +164,10 @@ export default class TilesetScene {
   // 新瓦片或重新加载的瓦片使用当前的隐藏和高亮状态。
   updateTileContent(content, config) {
     if (!content) return;
+    if (config.id === DYNAMIC_TILESET_ID) {
+      this.styleDynamicContent(content);
+      return;
+    }
     for (const inner of content.innerContents ?? []) this.updateTileContent(inner, config);
     if (!content.featuresLength) return;
 
@@ -176,7 +192,27 @@ export default class TilesetScene {
     }
   }
 
-  async updateLayer(layer) {
+  styleDynamicContent(content) {
+    const id = dynamicContentId(content);
+    if (id === undefined) return;
+    const key = featureKey(DYNAMIC_TILESET_ID, id);
+    const style = this.hiddenKeys.has(key) ? dynamicStyles.hidden
+      : key === this.selectedKey ? dynamicStyles.selected : undefined;
+    if (!this.contentStates.has(content) || this.contentStates.get(content) !== style) {
+      content.applyStyle(style);
+      this.contentStates.set(content, style);
+    }
+  }
+
+  async reloadLayer(layer) {
+    const runtime = this.layers.get(layer.config.id);
+    // 若首次加载尚未完成，等它退出后再取写入后的新版本。
+    await runtime.pending?.catch(() => {});
+    if (this.destroyed || !layer.enabled) return false;
+    return this.updateLayer(layer, true);
+  }
+
+  async updateLayer(layer, reload = false) {
     const { config } = layer;
     const runtime = this.layers.get(config.id);
     if (!layer.enabled) {
@@ -187,7 +223,7 @@ export default class TilesetScene {
     }
 
     try {
-      if (!runtime.tileset) {
+      if (!runtime.tileset || reload) {
         layer.status = "正在加载图层配置…";
         runtime.pending ??= Cesium.Cesium3DTileset.fromUrl(config.url, tilesetOptions(config))
           .then((tileset) => {
@@ -195,7 +231,6 @@ export default class TilesetScene {
               tileset.destroy();
               return;
             }
-            runtime.tileset = tileset;
             this.layersByTileset.set(tileset, config);
             tileset.show = layer.enabled;
             tileset.tileVisible.addEventListener(({ content }) => this.updateTileContent(content, config));
@@ -203,8 +238,11 @@ export default class TilesetScene {
               if (layer.enabled) layer.status = "部分瓦片加载失败";
               console.error(config.name, message);
             });
-            this.viewer.scene.primitives.add(tileset);
-            layer.tilesetReady = true;
+            const primitives = this.viewer.scene.primitives;
+            primitives.add(tileset);
+            if (runtime.tileset) primitives.remove(runtime.tileset);
+            runtime.tileset = tileset;
+            layer.tilesetReady = config.id !== DYNAMIC_TILESET_ID || tileset.root.children.length > 0;
           })
           .finally(() => { runtime.pending = undefined; });
         await runtime.pending;
@@ -214,13 +252,15 @@ export default class TilesetScene {
       runtime.tileset.show = layer.enabled;
       layer.status = layer.enabled ? "已开启" : "已关闭";
       this.viewer.scene.requestRender();
+      return true;
     } catch (error) {
       if (this.destroyed) return;
       if (layer.enabled) {
-        layer.enabled = false;
+        if (!reload) layer.enabled = false;
         layer.status = "图层配置加载失败，重新勾选可重试";
       }
       console.error(config.name, error);
+      return false;
     }
   }
 

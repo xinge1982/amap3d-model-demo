@@ -2,11 +2,11 @@
   <section class="panel placement-panel" aria-labelledby="placement-title">
     <header class="selection-heading">
       <h2 id="placement-title">摆放模型</h2>
-      <button type="button" @click="$emit('cancel')">取消</button>
+      <button type="button" :disabled="saving" @click="$emit('cancel')">取消</button>
     </header>
     <p class="intro">{{ item.name }}</p>
-    <p class="status" :class="{ error: error }" role="status">{{ error || status }}</p>
-    <fieldset :disabled="!ready">
+    <p class="status" :class="{ error: saveError || error }" role="status">{{ saveError || error || (saving ? '正在保存摆放…' : status) }}</p>
+    <fieldset :disabled="!ready || saving">
       <p class="field-label">变换模式</p>
       <div class="row">
         <button v-for="item in modes" :key="item.value" type="button"
@@ -50,6 +50,8 @@ export default {
     sceneController: { type: Object, required: true },
     item: { type: Object, required: true },
     anchor: { type: Object, default: null },
+    saving: { type: Boolean, default: false },
+    saveError: { type: String, default: '' },
   },
 
   data() {
@@ -70,11 +72,17 @@ export default {
     }
   },
 
+  watch: {
+    saving(value) {
+      this._resources.gizmo?.setEnabled(!value && this.enabled)
+    },
+  },
+
   created() {
     // Cesium 对象不进入 data，避免 Vue2 对大型场景对象递归观察。
     this._resources = {
       viewer: this.sceneController.viewer, model: null, gizmo: null, originalMatrix: null,
-      disposed: false, removeReady: null, removeError: null,
+      disposed: false, removeReady: null, removeError: null, placementId: Cesium.createGuid(),
     }
   },
 
@@ -88,14 +96,14 @@ export default {
 
   methods: {
     // 摆放流程复用主场景的 Viewer，销毁编辑器时只清理本次摆放资源。
-    disposePlacement(keepModel = false) {
+    disposePlacement() {
       const resources = this._resources
       if (resources.disposed) return
       resources.disposed = true
-      this.releaseModel(keepModel)
+      this.releaseModel()
     },
 
-    releaseModel(keepModel = false) {
+    releaseModel() {
       const resources = this._resources
       resources.removeReady?.()
       resources.removeError?.()
@@ -107,7 +115,7 @@ export default {
         Object.assign(viewer.scene.screenSpaceCameraController, resources.cameraInputs)
         resources.cameraInputs = null
       }
-      if (model && !keepModel) viewer.scene.primitives.remove(model)
+      if (model) viewer.scene.primitives.remove(model)
       resources.model = null
       resources.gizmo = null
       viewer.scene.requestRender()
@@ -194,6 +202,10 @@ export default {
         gizmo.setMode(GizmoMode.translate)
         gizmo.coordinateMode = CoordinateMode.surface
         gizmo.mountToPrimitive(resources.model, resources.viewer)
+        const initialBounds = resources.model.boundingSphere
+        const worldToLocal = Cesium.Matrix4.inverseTransformation(resources.originalMatrix, new Cesium.Matrix4())
+        const center = Cesium.Matrix4.multiplyByPoint(worldToLocal, initialBounds.center, new Cesium.Cartesian3())
+        resources.localBounds = [...Cesium.Cartesian3.pack(center, []), initialBounds.radius]
         this.ready = true
         this.loading = false
         this.status = '模型已就绪'
@@ -273,20 +285,16 @@ export default {
       })
     },
 
-    // 保留已摆放的模型。父组件接收可直接序列化的变换数据。
+    // 预览保留到保存成功。重试同一摆放时复用 ID。
     confirmPlacement() {
-      if (!this.ready || this._resources.disposed) return
-      const placement = {
-        placementId: Cesium.createGuid(),
+      const resources = this._resources
+      if (!this.ready || this.saving || resources.disposed) return
+      this.$emit('confirm', {
+        placementId: resources.placementId,
         modelId: this.item.id,
-        modelName: this.item.name,
-        url: this.item.url,
-        coordinateReferenceSystem: 'WGS84 / ECEF',
-        matrixLayout: 'column-major',
-        ...this.readTransform(),
-      }
-      this.disposePlacement(true)
-      this.$emit('confirm', placement)
+        modelMatrix: Cesium.Matrix4.toArray(resources.model.modelMatrix),
+        localBounds: resources.localBounds,
+      })
     },
   },
 }
