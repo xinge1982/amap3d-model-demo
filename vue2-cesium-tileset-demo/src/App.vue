@@ -15,7 +15,13 @@
         <button type="button" :disabled="!sceneReady" :aria-expanded="String(cameraOpen)" aria-controls="camera-panel" @click="toggleCamera">
           相机参数
         </button>
-        <button class="place-model-button" type="button" :disabled="!sceneReady || saving || Boolean(placement)" @click="openModelPicker('place')">
+        <button
+          class="place-model-button"
+          type="button"
+          :aria-pressed="String(placementActive)"
+          :disabled="!sceneReady || saving || Boolean(placement)"
+          @click="openModelPicker('place')"
+        >
           摆放模型
         </button>
       </div>
@@ -137,6 +143,9 @@ export default {
     };
   },
   computed: {
+    placementActive() {
+      return Boolean(this.placement) || this.modelPickerMode === "place" || this.modelPickerMode === "replace";
+    },
     modelPickerTitle() {
       if (this.modelPickerMode === "replace") return "选择替换模型";
       return this.modelPickerMode === "place" ? "选择摆放模型" : "模型库";
