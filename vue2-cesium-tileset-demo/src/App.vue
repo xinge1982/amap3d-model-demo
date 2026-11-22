@@ -121,7 +121,7 @@ export default {
   data() {
     return {
       layers: [],
-      layersOpen: true,
+      layersOpen: false,
       sceneReady: false,
       globeVisible: true,
       cameraOpen: false,
