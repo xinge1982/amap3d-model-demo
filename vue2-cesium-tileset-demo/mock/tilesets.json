@@ -4,7 +4,7 @@
     "name": "收费站",
     "title": "G1503",
     "url": "http://114.255.88.211:48610/share/shanghai_g1503/features/tileset.json",
-    "defaultLoad": false,
+    "defaultLoad": true,
     "options": {
       "modelForwardAxis": "Y",
       "modelUpAxis": "Z"
@@ -44,8 +44,9 @@
     "id": "feature",
     "name": "设备设施",
     "title": "G1503",
-    "defaultLoad": false,
-    "url": "http://114.255.88.211:48610/share/shanghai_g1503/network_shanghai_g1503_2026/tilesets/features/tileset.json"
+    "defaultLoad": true,
+    "url": "http://114.255.88.211:48610/share/shanghai_g1503/network_shanghai_g1503_2026/tilesets/features/tileset.json",
+    "focus": false
   },
   {
     "id": "bridge",
@@ -67,7 +68,7 @@
     "name": "新建路隧道",
     "title": "新建路",
     "url": "http://114.255.88.211:48610/share/shanghai_g1503/tunnel_xjl/tileset.json",
-    "defaultLoad": true,
-    "focus": true
+    "defaultLoad": false,
+    "focus": false
   }
 ]

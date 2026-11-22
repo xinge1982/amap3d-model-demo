@@ -33,6 +33,7 @@ export default class TilesetScene {
       url: "https://webst01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=6&x={x}&y={y}&z={z}",
       tilingScheme: new Cesium.WebMercatorTilingScheme(),
       credit: "高德地图",
+      maximumLevel: 16,
     });
 
     const viewer = new Cesium.Viewer(container, {
