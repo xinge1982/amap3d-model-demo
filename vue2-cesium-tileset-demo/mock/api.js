@@ -22,22 +22,34 @@ function isPlacementMatrix(value) {
   return Number.isFinite(determinant) && determinant !== 0;
 }
 
+function readRecords(file) {
+  try {
+    const records = JSON.parse(readFileSync(file, "utf8"));
+    if (!Array.isArray(records)) throw new Error("模型变更文件必须包含 JSON 数组。");
+    return records;
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+    return undefined;
+  }
+}
+
 function createMockApi() {
   const router = express.Router();
-  const dataFile = process.env.MOCK_DATA_FILE
-    ? resolve(process.env.MOCK_DATA_FILE)
-    : resolve(__dirname, "..", ".mock-data/deleted-features.json");
-  let records = new Map();
+  const customDataFile = process.env.MOCK_DATA_FILE;
+  const dataFile = customDataFile
+    ? resolve(customDataFile)
+    : resolve(__dirname, "..", ".mock-data/changed-features.json");
+  let savedRecords = readRecords(dataFile);
+  if (savedRecords === undefined && !customDataFile) {
+    const legacyFile = resolve(dirname(dataFile), "deleted-features.json");
+    savedRecords = readRecords(legacyFile);
+    if (savedRecords !== undefined) renameSync(legacyFile, dataFile);
+  }
 
-  try {
-    for (const record of JSON.parse(readFileSync(dataFile, "utf8"))) {
-      // 老版文件中每一项都是已删除或被替换的原单体。
-      records.set(record.id, { ...record, deleted: record.deleted ?? true });
-    }
-  } catch (error) {
-    if (error.code !== "ENOENT") {
-      throw error;
-    }
+  let records = new Map();
+  for (const record of savedRecords ?? []) {
+    // 老版文件中每一项都是已删除或被替换的原单体。
+    records.set(record.id, { ...record, deleted: record.deleted ?? true });
   }
 
   function commitRecords(next, res) {

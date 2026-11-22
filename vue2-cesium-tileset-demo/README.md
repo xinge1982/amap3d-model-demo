@@ -50,7 +50,7 @@ npm run serve
 
 `action` 可取 `delete` 或 `replace`，省略时默认为 `delete`。替换操作可传入模型库中的 `modelId`。单体 ID 来自瓦片 feature 的 `id` 属性，允许字符串或安全整数。通过 `tilesetId:featureId` 匹配单体，同一图层的各级瓦片应给同一单体提供相同的 ID。配置里的 `hideFeatureIds` 会应用到本层。隧道的 `clip` 参数随接口返回，裁剪交互留待后续实现。
 
-摆放和隐藏记录共用 `.mock-data/deleted-features.json`，每项使用 `deleted` 标志记录隐藏状态。旧版隐藏记录会继续生效。刷新页面和重启服务都会恢复已保存的模型和隐藏状态。停止服务后可删除该文件来重置操作记录。
+摆放和隐藏记录默认共用 `.mock-data/changed-features.json`，每项使用 `deleted` 标志记录隐藏状态。使用默认路径时，如果新文件不存在，服务启动时会将旧的 `deleted-features.json` 迁移为新文件名。刷新页面和重启服务都会恢复已保存的模型和隐藏状态。停止服务后可删除该文件来重置操作记录。
 
 ## 构建和运行
 
