@@ -92,3 +92,6 @@ dd { margin: 0; overflow-wrap: anywhere; }
   .layers { max-height: min(45dvh, 26rem); }
   .selection { bottom: 1.75rem; }
 }
+
+.model-library-button { margin-top: 0.85rem; }
+.library-choice { margin: 0.6rem 0 0; color: #bfd0db; font-size: 0.85rem; overflow-wrap: anywhere; }

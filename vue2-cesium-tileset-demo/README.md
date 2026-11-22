@@ -14,7 +14,7 @@ npm run serve
 
 打开 [http://localhost:8080](http://localhost:8080)。Vue CLI 开发服务同时提供页面和 mock API。可用 `npm run serve -- --port 8081` 切换端口。`MOCK_DATA_FILE` 可指定操作记录文件。
 
-默认打开道路面、隧道和新建路隧道，优先定位到新建路隧道。勾选其他图层可加载数据。点击场景中的单体后，可选择「删除单体」或「标记替换」。
+默认打开道路面、隧道和新建路隧道，优先定位到新建路隧道。勾选其他图层可加载数据。点击场景中的单体后，可选择「删除单体」或「选择替换模型」。
 
 图层的 `tileset.json` 加载成功后即可定位，子瓦片会随视角继续加载。关闭已加载的图层后仍可定位到其范围，图层继续保持隐藏。
 
@@ -35,11 +35,12 @@ npm run serve
 {
   "tilesetId": "tunnel",
   "featureId": "abc_1",
-  "action": "replace"
+  "action": "replace",
+  "modelId": "camera-01"
 }
 ```
 
-`action` 可取 `delete` 或 `replace`，省略时默认为 `delete`。单体 ID 来自瓦片 feature 的 `id` 属性，允许字符串或安全整数。通过 `tilesetId:featureId` 匹配单体，同一图层的各级瓦片应给同一单体提供相同的 ID。配置里的 `hideFeatureIds` 会应用到本层。隧道的 `clip` 参数随接口返回，裁剪交互留待后续实现。
+`action` 可取 `delete` 或 `replace`，省略时默认为 `delete`。替换操作可传入模型库中的 `modelId`。单体 ID 来自瓦片 feature 的 `id` 属性，允许字符串或安全整数。通过 `tilesetId:featureId` 匹配单体，同一图层的各级瓦片应给同一单体提供相同的 ID。配置里的 `hideFeatureIds` 会应用到本层。隧道的 `clip` 参数随接口返回，裁剪交互留待后续实现。
 
 操作记录默认写入 `.mock-data/deleted-features.json`。刷新页面和重启服务都会恢复隐藏状态。停止服务后可删除该文件来重置操作记录。
 
@@ -53,3 +54,22 @@ npm start
 构建生成 `dist/`。运行服务从同一端口提供构建产物和 mock API，`PORT` 可修改默认端口 8080。部署时保留 `mock/`、`src/feature-id.js`、`dist/` 以及生产依赖。Cesium 预构建脚本、样式、Workers 和静态资源会复制到 `dist/vendor/cesium/`。
 
 `src/App.vue` 管理图层面板和操作状态，`src/tileset-scene.js` 管理 Cesium 场景、瓦片加载以及单体拾取和高亮。开发与构建运行共用 `mock/api.js`。
+
+## 模型库和预览
+
+- 点击左侧「模型库」，依次选择模型大类、小类和名称。选中名称后会生成 PNG 预览，点击「确定选择」后，已选模型显示在左侧。
+- 选中场景单体后，点击「选择替换模型」，确认后 mock 记录该模型的 `modelId` 并隐藏原单体。替换模型的场景摆放留待后续实现。
+- `GET /api/models` 返回模型数组。编辑 `mock/models.json` 增加条目，将对应的 GLB 文件放入 `mock/models/` 后重启服务。开发服务和构建后的服务都通过 `/api/models/files/<文件名>.glb` 提供文件。
+- 项目自带六个简化示例，覆盖设备（相机、雷达、ETC）、龙门架和标志牌。Three.js 在首次生成预览时创建一个 WebGLRenderer，后续预览复用该实例。
+
+模型条目示例：
+
+```json
+{
+  "id": "camera-01",
+  "category": "设备",
+  "subcategory": "相机",
+  "name": "枪式相机",
+  "url": "/api/models/files/camera-01.glb"
+}
+```

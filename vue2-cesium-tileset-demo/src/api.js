@@ -14,10 +14,14 @@ export function loadTilesetConfig() {
   ]);
 }
 
-export function hideFeature(tilesetId, featureId, action) {
+export function loadModelCatalog() {
+  return request("/api/models");
+}
+
+export function hideFeature(tilesetId, featureId, action, modelId) {
   return request("/api/tilesets/feature", {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tilesetId, featureId, action }),
+    body: JSON.stringify({ tilesetId, featureId, action, modelId }),
   });
 }

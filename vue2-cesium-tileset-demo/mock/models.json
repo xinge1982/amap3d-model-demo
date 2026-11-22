@@ -1,0 +1,8 @@
+[
+  { "id": "camera-01", "category": "设备", "subcategory": "相机", "name": "枪式相机", "url": "/api/models/files/camera-01.glb" },
+  { "id": "camera-02", "category": "设备", "subcategory": "相机", "name": "球形相机", "url": "/api/models/files/camera-02.glb" },
+  { "id": "radar-01", "category": "设备", "subcategory": "雷达", "name": "路侧雷达", "url": "/api/models/files/radar-01.glb" },
+  { "id": "etc-01", "category": "设备", "subcategory": "ETC", "name": "ETC 天线", "url": "/api/models/files/etc-01.glb" },
+  { "id": "gantry-01", "category": "龙门架", "subcategory": "门式", "name": "双柱龙门架", "url": "/api/models/files/gantry-01.glb" },
+  { "id": "sign-01", "category": "标志牌", "subcategory": "指路标志", "name": "路侧指路牌", "url": "/api/models/files/sign-01.glb" }
+]

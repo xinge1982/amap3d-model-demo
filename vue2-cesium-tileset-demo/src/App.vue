@@ -7,6 +7,8 @@
         <p class="brand">AMap3D</p>
         <h1 id="layers-title">Tileset 单体演示</h1>
       </header>
+      <button class="model-library-button" type="button" :disabled="saving" @click="openModelPicker('browse')">模型库</button>
+      <p v-if="libraryModel" class="library-choice">已选模型：{{ libraryModel.name }}</p>
       <ul id="layer-list" aria-label="场景图层">
         <li v-for="layer in layers" :key="layer.config.id" class="layer">
           <label>
@@ -38,18 +40,27 @@
       <p>删除或标记替换后，原单体将从场景中隐藏。</p>
       <p v-if="selectionError" id="selection-error" role="alert">{{ selectionError }}</p>
       <div class="actions">
-        <button class="primary" type="button" :disabled="saving" @click="saveSelection('replace')">标记替换</button>
+        <button class="primary" type="button" :disabled="saving" @click="openModelPicker('replace')">选择替换模型</button>
         <button class="danger" type="button" :disabled="saving" @click="saveSelection('delete')">删除单体</button>
       </div>
     </section>
+
+    <ModelPicker
+      v-if="modelPickerMode"
+      :title="modelPickerMode === 'replace' ? '选择替换模型' : '模型库'"
+      @cancel="modelPickerMode = ''"
+      @confirm="confirmModel"
+    />
   </div>
 </template>
 
 <script>
 import { hideFeature, loadTilesetConfig } from "./api";
+import ModelPicker from "./ModelPicker.vue";
 import TilesetScene from "./tileset-scene";
 
 export default {
+  components: { ModelPicker },
   data() {
     return {
       layers: [],
@@ -57,6 +68,8 @@ export default {
       canRetry: false,
       selected: undefined,
       saving: false,
+      modelPickerMode: "",
+      libraryModel: undefined,
       selectionError: "",
     };
   },
@@ -136,17 +149,32 @@ export default {
       this.sceneController.select(feature?.key);
     },
 
-    async saveSelection(action) {
+    openModelPicker(mode) {
+      if (mode === "replace") this.selectionError = "";
+      this.modelPickerMode = mode;
+    },
+
+    confirmModel(model) {
+      const mode = this.modelPickerMode;
+      this.modelPickerMode = "";
+      if (mode === "replace") {
+        this.saveSelection("replace", model);
+      } else {
+        this.libraryModel = model;
+      }
+    },
+
+    async saveSelection(action, model) {
       if (!this.selected || this.saving) return;
       const { layerId, id, key } = this.selected;
       this.saving = true;
       this.selectionError = "";
       try {
-        await hideFeature(layerId, id, action);
+        await hideFeature(layerId, id, action, model?.id);
         if (this.disposed) return;
         this.sceneController.hide(key);
         this.selectFeature();
-        this.status = action === "replace" ? "已标记替换，原单体已隐藏。" : "已删除，单体已隐藏。";
+        this.status = action === "replace" ? `已标记替换为「${model.name}」，原单体已隐藏。` : "已删除，单体已隐藏。";
       } catch (error) {
         if (!this.disposed) this.selectionError = error.message;
       } finally {

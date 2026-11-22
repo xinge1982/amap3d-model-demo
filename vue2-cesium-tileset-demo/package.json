@@ -11,8 +11,9 @@
   "dependencies": {
     "cesium": "1.136.0",
     "core-js": "3",
-    "vue": "2.7.16",
-    "express": "5.1.0"
+    "express": "5.1.0",
+    "three": "0.160.1",
+    "vue": "2.7.16"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "4.5.19",
