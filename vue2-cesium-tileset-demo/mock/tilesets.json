@@ -3,7 +3,7 @@
     "id": "building",
     "name": "收费站",
     "title": "G1503",
-    "url": "https://47.104.194.94:28199/share/shanghai_g1503/features/tileset.json",
+    "url": "http://114.255.88.211:48610/share/shanghai_g1503/features/tileset.json",
     "defaultLoad": false,
     "options": {
       "modelForwardAxis": "Y",
@@ -14,7 +14,7 @@
     "id": "roadsurface",
     "name": "道路面",
     "title": "G1503",
-    "url": "https://47.104.194.94:28199/share/shanghai_g1503/roadsurface/tileset.json",
+    "url": "http://114.255.88.211:48610/share/shanghai_g1503/roadsurface/tileset.json",
     "defaultLoad": true,
     "options": {
       "modelForwardAxis": "Y",
@@ -25,7 +25,7 @@
     "id": "tunnel",
     "name": "隧道",
     "title": "G1503",
-    "url": "https://47.104.194.94:28199/share/shanghai_g1503/tunnel/tileset.json",
+    "url": "http://114.255.88.211:48610/share/shanghai_g1503/tunnel/tileset.json",
     "defaultLoad": true,
     "focus": false,
     "hideFeatureIds": [
@@ -45,20 +45,20 @@
     "name": "设备设施",
     "title": "G1503",
     "defaultLoad": false,
-    "url": "https://47.104.194.94:28199/share/networks/network_shanghai_g1503_2026/tilesets/features/tileset.json"
+    "url": "http://114.255.88.211:48610/share/shanghai_g1503/network_shanghai_g1503_2026/tilesets/features/tileset.json"
   },
   {
     "id": "bridge",
     "name": "桥梁",
     "title": "G1503",
     "defaultLoad": false,
-    "url": "https://47.104.194.94:28199/share/shanghai_g1503/bridge/tileset.json"
+    "url": "http://114.255.88.211:48610/share/shanghai_g1503/bridge/tileset.json"
   },
   {
     "id": "tunnel_rml",
     "name": "人民路隧道",
     "title": "人民路",
-    "url": "https://47.104.194.94:28199/share/shanghai_g1503/tunnel_rml/tileset.json",
+    "url": "http://114.255.88.211:48610/share/shanghai_g1503/tunnel_rml/tileset.json",
     "defaultLoad": false,
     "focus": false
   },
@@ -66,7 +66,7 @@
     "id": "tunnel_xjl",
     "name": "新建路隧道",
     "title": "新建路",
-    "url": "https://47.104.194.94:28199/share/shanghai_g1503/tunnel_xjl/tileset.json",
+    "url": "http://114.255.88.211:48610/share/shanghai_g1503/tunnel_xjl/tileset.json",
     "defaultLoad": true,
     "focus": true
   }
