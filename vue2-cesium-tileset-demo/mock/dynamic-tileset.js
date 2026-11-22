@@ -1,6 +1,9 @@
 const { Axis, BoundingSphere, Cartesian3, Matrix4 } = require("cesium");
 const { DYNAMIC_TILESET_ID } = require("../src/feature-id");
 
+// 按默认 16 px SSE 设置细化距离，小模型在约 200 米处也能开始加载。
+const DYNAMIC_GEOMETRIC_ERROR = 5;
+
 const config = {
   id: DYNAMIC_TILESET_ID,
   name: "动态模型",
@@ -8,6 +11,7 @@ const config = {
   url: "/api/tilesets/dynamic",
   defaultLoad: true,
   focus: false,
+  options: { dynamicScreenSpaceError: false },
 };
 
 // 独立 Model 用 Y-up/Z-forward，3D Tiles 的 glTF 内容用 Y-up/X-forward。
@@ -48,7 +52,7 @@ function buildDynamicTileset(records) {
     });
   }
 
-  const geometricError = rootSphere.radius;
+  const geometricError = children.length > 0 ? DYNAMIC_GEOMETRIC_ERROR : 0;
   return {
     asset: { version: "1.1" },
     schema: {
