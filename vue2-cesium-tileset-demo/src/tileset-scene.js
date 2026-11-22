@@ -75,6 +75,30 @@ export default class TilesetScene {
     handler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
   }
 
+  setGlobeVisible(visible) {
+    const scene = this.viewer.scene;
+    scene.globe.show = visible;
+    scene.requestRender();
+  }
+
+  watchCamera(onChange) {
+    const { scene } = this.viewer;
+    const { camera } = scene;
+    const update = () => {
+      const position = camera.positionCartographic;
+      onChange({
+        lon: Cesium.Math.toDegrees(position.longitude),
+        lat: Cesium.Math.toDegrees(position.latitude),
+        height: position.height,
+        heading: Cesium.Math.toDegrees(camera.heading),
+        pitch: Cesium.Math.toDegrees(camera.pitch),
+        roll: Cesium.Math.toDegrees(camera.roll),
+      });
+    };
+    update();
+    return scene.postRender.addEventListener(update);
+  }
+
   pick(position) {
     const feature = this.viewer.scene.pick(position);
     const config = this.layersByFeature.get(feature) ??
@@ -191,10 +215,29 @@ export default class TilesetScene {
   }
 
   locate(layer) {
-    const tileset = this.layers.get(layer.config.id).tileset;
-    return !this.destroyed && tileset
-      ? this.viewer.flyTo(tileset)
-      : false;
+    const { id, viewPoint } = layer.config;
+    const tileset = this.layers.get(id).tileset;
+    if (this.destroyed || !tileset) return false;
+    if (!viewPoint) return this.viewer.flyTo(tileset);
+
+    const { lon, lat, height, heading, pitch, roll } = viewPoint;
+    if (![lon, lat, height, heading, pitch, roll].every(Number.isFinite) ||
+        Math.abs(lon) > 180 || Math.abs(lat) > 90) {
+      return this.viewer.flyTo(tileset);
+    }
+
+    return new Promise((resolve) => {
+      this.viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(lon, lat, height),
+        orientation: {
+          heading: Cesium.Math.toRadians(heading),
+          pitch: Cesium.Math.toRadians(pitch),
+          roll: Cesium.Math.toRadians(roll),
+        },
+        complete: () => resolve(true),
+        cancel: () => resolve(false),
+      });
+    });
   }
 
   async loadDefaults(layers) {
@@ -207,7 +250,10 @@ export default class TilesetScene {
     for (const layer of focusOrder) {
       await tasks.get(layer);
       if (this.destroyed) break;
-      if (layer.enabled && await this.locate(layer)) break;
+      if (layer.enabled && layer.tilesetReady) {
+        await this.locate(layer);
+        break;
+      }
     }
   }
 
