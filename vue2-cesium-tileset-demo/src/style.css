@@ -95,3 +95,31 @@ dd { margin: 0; overflow-wrap: anywhere; }
 
 .model-library-button { margin-top: 0.85rem; }
 .library-choice { margin: 0.6rem 0 0; color: #bfd0db; font-size: 0.85rem; overflow-wrap: anywhere; }
+
+#scene .cesium-widget-cesiumNavigationContainer .compass {
+  top: 1rem;
+  right: 0.75rem;
+}
+
+#scene .cesium-widget-cesiumNavigationContainer .navigation-controls {
+  top: calc(1rem + 104px);
+  right: calc(0.75rem + 32.5px);
+  border-color: #476071;
+  border-radius: 0.35rem;
+  background: #122232f5;
+}
+
+#scene .cesium-widget-cesiumNavigationContainer .distance-legend {
+  left: 1rem;
+  background: #122232f5;
+}
+
+@media screen {
+  #scene .cesium-widget-cesiumNavigationContainer .compass,
+  #scene .cesium-widget-cesiumNavigationContainer .navigation-controls,
+  #scene .cesium-widget-cesiumNavigationContainer .distance-legend { display: block; }
+}
+
+@media screen and (max-width: 460px) {
+  .layers { max-width: calc(100vw - 8rem); }
+}

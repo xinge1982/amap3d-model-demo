@@ -1,4 +1,5 @@
 import * as Cesium from "cesium";
+import CesiumNavigation from "cesium-navigation-es6";
 import { featureKey, normalizeFeatureId, readFeatureId } from "./feature-id";
 
 function tilesetOptions(config) {
@@ -51,7 +52,23 @@ export default class TilesetScene {
     });
     this.viewer = viewer;
     viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString("#253643");
-    viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(121.47, 31.23, 90000) });
+    const homePosition = Cesium.Cartographic.fromDegrees(121.47, 31.23, 90000);
+    const homeOrientation = { heading: 0, pitch: -Cesium.Math.PI_OVER_TWO, roll: 0 };
+    viewer.camera.setView({
+      destination: Cesium.Cartographic.toCartesian(homePosition),
+      orientation: homeOrientation,
+    });
+    this.navigation = new CesiumNavigation(viewer, {
+      defaultResetView: homePosition,
+      orientation: homeOrientation,
+      enableCompass: true,
+      enableCompassOuterRing: true,
+      enableZoomControls: true,
+      enableDistanceLegend: true,
+      resetTooltip: "返回上海初始视角",
+      zoomInTooltip: "放大",
+      zoomOutTooltip: "缩小",
+    });
     const handler = viewer.screenSpaceEventHandler;
     handler.setInputAction(({ position }) => onPick(this.pick(position)), Cesium.ScreenSpaceEventType.LEFT_CLICK);
     handler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
@@ -195,6 +212,7 @@ export default class TilesetScene {
 
   destroy() {
     this.destroyed = true;
+    this.navigation.destroy();
     this.viewer.destroy();
   }
 }
