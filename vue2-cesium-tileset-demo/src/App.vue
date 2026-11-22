@@ -28,6 +28,7 @@
       <div class="toolbar-feedback">
         <p id="status" role="status">{{ status }}</p>
         <button v-if="canRetry" id="retry-start" type="button" @click="start">重新读取配置</button>
+        <button v-if="canRetryDynamic" type="button" :disabled="saving" @click="retryDynamic">刷新动态模型</button>
       </div>
     </header>
 
@@ -76,6 +77,8 @@
         :scene-controller="sceneController"
         :item="placement.model"
         :anchor="placement.anchor"
+        :saving="saving"
+        :save-error="placementError"
         @cancel="cancelPlacement"
         @confirm="confirmPlacement"
       />
@@ -108,10 +111,11 @@
 </template>
 
 <script>
-import { hideFeature, loadTilesetConfig } from "./api";
+import { hideFeature, loadTilesetConfig, savePlacement } from "./api";
 import ModelPicker from "./ModelPicker.vue";
 import ModelPlacement from "./ModelPlacement.vue";
 import TilesetScene from "./tileset-scene";
+import { DYNAMIC_TILESET_ID } from "./feature-id";
 
 const CAMERA_FIELDS = [
   { key: "lon", label: "经度", decimals: 8, unit: "°" },
@@ -134,10 +138,12 @@ export default {
       cameraViewPoint: undefined,
       status: "正在读取图层配置…",
       canRetry: false,
+      canRetryDynamic: false,
       selected: undefined,
       saving: false,
       modelPickerMode: "",
       placement: null,
+      placementError: "",
       libraryModel: undefined,
       selectionError: "",
     };
@@ -287,11 +293,13 @@ export default {
       const anchor = replacement ? this.selectedAnchor ?? null : null;
       // 预览期间清除原单体高亮，取消后再恢复选择。
       this.sceneController.select(undefined);
+      this.placementError = "";
       this.placement = Object.freeze({ model, replacement, anchor });
       this.status = replacement ? "正在摆放替换模型。" : "请单击场景选择落点。";
     },
 
     cancelPlacement() {
+      if (this.saving) return;
       this.$refs.placement?.disposePlacement();
       const { replacement, anchor } = this.placement;
       this.placement = null;
@@ -300,18 +308,47 @@ export default {
       this.status = "已取消摆放。";
     },
 
-    confirmPlacement(placedModel) {
-      const { replacement } = this.placement;
-      const data = { ...placedModel, action: replacement ? "replace" : "place" };
-      if (replacement) {
-        this.sceneController.hide(replacement.key);
-        data.tilesetId = replacement.layerId;
-        data.featureId = replacement.id;
+    async refreshDynamic(successMessage, enable = false) {
+      const layer = this.layers.find(({ config }) => config.id === DYNAMIC_TILESET_ID);
+      if (enable) layer.enabled = true;
+      this.canRetryDynamic = false;
+      const refreshed = await this.sceneController.reloadLayer(layer);
+      if (this.disposed) return;
+      this.canRetryDynamic = !refreshed && layer.enabled;
+      this.status = this.canRetryDynamic ? "变更已保存，刷新动态模型失败，请重试。" : successMessage;
+    },
+
+    async retryDynamic() {
+      if (this.saving) return;
+      this.saving = true;
+      try {
+        await this.refreshDynamic("动态模型已刷新。", true);
+      } finally {
+        if (!this.disposed) this.saving = false;
       }
-      console.log("模型摆放结果", data);
-      this.placement = null;
-      this.selectFeature();
-      this.status = replacement ? "已完成替换摆放，结果已输出到控制台。" : "已完成模型摆放，结果已输出到控制台。";
+    },
+
+    async confirmPlacement(placedModel) {
+      if (this.saving || !this.placement) return;
+      const { replacement } = this.placement;
+      this.saving = true;
+      this.placementError = "";
+      try {
+        await savePlacement(placedModel, replacement
+          ? { tilesetId: replacement.layerId, featureId: replacement.id }
+          : undefined);
+        if (this.disposed) return;
+
+        this.$refs.placement.disposePlacement();
+        this.placement = null;
+        if (replacement) this.sceneController.hide(replacement.key);
+        this.selectFeature();
+        await this.refreshDynamic(replacement ? "替换模型已保存。" : "模型摆放已保存。", true);
+      } catch (error) {
+        if (!this.disposed) this.placementError = error.message;
+      } finally {
+        if (!this.disposed) this.saving = false;
+      }
     },
 
     async saveSelection(action) {
@@ -324,7 +361,8 @@ export default {
         if (this.disposed) return;
         this.sceneController.hide(key);
         this.selectFeature();
-        this.status = "已删除，单体已隐藏。";
+        if (layerId === DYNAMIC_TILESET_ID) await this.refreshDynamic("动态单体已删除。");
+        else this.status = "已删除，单体已隐藏。";
       } catch (error) {
         if (!this.disposed) this.selectionError = error.message;
       } finally {

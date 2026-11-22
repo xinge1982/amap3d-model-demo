@@ -25,3 +25,12 @@ export function hideFeature(tilesetId, featureId, action, modelId) {
     body: JSON.stringify({ tilesetId, featureId, action, modelId }),
   });
 }
+
+export function savePlacement(placement, replacement) {
+  const { placementId, modelId, modelMatrix, localBounds } = placement;
+  return request("/api/tilesets/placements", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ placementId, modelId, modelMatrix, localBounds, replacement }),
+  });
+}

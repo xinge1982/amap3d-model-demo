@@ -1,3 +1,5 @@
+const DYNAMIC_TILESET_ID = "dynamic";
+
 function normalizeFeatureId(value) {
   if (typeof value === "string" && value.trim() !== "") {
     return value;
@@ -16,4 +18,4 @@ function readFeatureId(feature) {
   return normalizeFeatureId(feature?.getProperty?.("id"));
 }
 
-module.exports = { featureKey, normalizeFeatureId, readFeatureId };
+module.exports = { DYNAMIC_TILESET_ID, featureKey, normalizeFeatureId, readFeatureId };
