@@ -8,6 +8,14 @@
     "options": {
       "modelForwardAxis": "Y",
       "modelUpAxis": "Z"
+    },
+    "viewPoint": {
+      "lon": 121.77220089,
+      "lat": 31.13992788,
+      "height": 50.358,
+      "heading": 342.952,
+      "pitch": -12.146,
+      "roll": 360
     }
   },
   {
@@ -46,7 +54,16 @@
     "title": "G1503",
     "defaultLoad": true,
     "url": "http://114.255.88.211:48610/share/shanghai_g1503/network_shanghai_g1503_2026/tilesets/features/tileset.json",
-    "focus": false
+    "focus": false,
+    "viewPoint": {
+        "lon": 121.78450858,
+        "lat": 31.10448555,
+        "height": 30.945,
+        "heading": 352.521,
+        "pitch": -27.551,
+        "roll": 0
+      }
+    }
   },
   {
     "id": "bridge",
