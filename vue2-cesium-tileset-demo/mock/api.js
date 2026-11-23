@@ -124,7 +124,7 @@ function createMockApi() {
     res.json(buildDynamicTileset(records.values()));
   });
 
-  router.get(["/tilesets/deleted", "/tileset/deleted"], (req, res) => {
+  router.get("/tilesets/deleted", (req, res) => {
     res.json([...records.values()].filter(({ deleted }) => deleted).map(({ id }) => id));
   });
 
