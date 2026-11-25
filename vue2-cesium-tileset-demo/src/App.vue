@@ -6,8 +6,11 @@
         <h1>Tileset 单体演示</h1>
       </div>
       <div class="toolbar-actions" role="group" aria-label="场景工具">
-        <button type="button" :disabled="Boolean(placement)" :aria-expanded="String(layersOpen && !placement)" aria-controls="layers-panel" @click="layersOpen = !layersOpen">
+        <button type="button" :disabled="Boolean(placement)" :aria-expanded="String(layersOpen && !placement)" aria-controls="layers-panel" @click="toggleLayers">
           图层（{{ layers.length }}）
+        </button>
+        <button type="button" :disabled="placementActive" :aria-expanded="String(changesOpen && !placement)" aria-controls="changes-panel" @click="toggleChanges">
+          修改信息
         </button>
         <button type="button" :disabled="!sceneReady" @click="toggleGlobe">
           {{ globeVisible ? "隐藏地球" : "显示地球" }}
@@ -56,6 +59,16 @@
           </li>
         </ul>
       </aside>
+
+      <FeatureChanges
+        v-if="changesOpen && !placement"
+        :revision="changesRevision"
+        :busy="saving || reloading || placementActive"
+        :scene-ready="sceneReady"
+        @close="changesOpen = false"
+        @locate="locateChange"
+        @restore="restoreChange"
+      />
 
       <aside v-show="cameraOpen" id="camera-panel" class="panel camera-panel" aria-labelledby="camera-title">
         <header class="selection-heading">
@@ -116,7 +129,8 @@
 </template>
 
 <script>
-import { hideFeature, loadPlacement, loadTilesetConfig, movePlacement, savePlacement } from "./api";
+import { hideFeature, loadDeletedFeatureIds, loadPlacement, loadTilesetConfig, movePlacement, restoreFeatureChange, savePlacement } from "./api";
+import FeatureChanges from "./FeatureChanges.vue";
 import ModelPicker from "./ModelPicker.vue";
 import ModelPlacement from "./ModelPlacement.vue";
 import TilesetScene from "./tileset-scene";
@@ -132,11 +146,13 @@ const CAMERA_FIELDS = [
 ];
 
 export default {
-  components: { ModelPicker, ModelPlacement },
+  components: { FeatureChanges, ModelPicker, ModelPlacement },
   data() {
     return {
       layers: [],
       layersOpen: false,
+      changesOpen: false,
+      changesRevision: 0,
       reloading: false,
       sceneReady: false,
       globeVisible: true,
@@ -237,6 +253,16 @@ export default {
       this.sceneController.setGlobeVisible(this.globeVisible);
     },
 
+    toggleLayers() {
+      this.layersOpen = !this.layersOpen;
+      if (this.layersOpen) this.changesOpen = false;
+    },
+
+    toggleChanges() {
+      this.changesOpen = !this.changesOpen;
+      if (this.changesOpen) this.layersOpen = false;
+    },
+
     toggleCamera() {
       this.cameraOpen = !this.cameraOpen;
       if (this.cameraOpen) {
@@ -279,6 +305,60 @@ export default {
 
     locate(layer) {
       this.sceneController.locate(layer);
+    },
+
+    async locateChange(record) {
+      const { tilesetId, id, worldBounds } = record;
+      if (this.selected?.key === id) this.selectFeature();
+      if (worldBounds) {
+        this.sceneController.flyToFeatureBounds(worldBounds);
+        this.status = record.deleted ? "正在定位已删除单体的原位置。" : "正在定位单体。";
+        return;
+      }
+      const tileBounds = this.sceneController.findLoadedFeatureBounds(tilesetId, id);
+      if (tileBounds) {
+        this.sceneController.flyToFeatureBounds(tileBounds);
+        this.status = "旧记录缺少单体坐标，已定位到所在瓦片。";
+        return;
+      }
+      const layer = this.layers.find(({ config }) => config.id === tilesetId);
+      if (!layer) {
+        this.status = "该记录没有位置，其原图层也不在场景配置中。";
+        return;
+      }
+      if (!layer.tilesetReady) await this.sceneController.reloadLayer(layer);
+      if (this.disposed) return;
+      this.status = await this.sceneController.locate(layer)
+        ? "旧记录缺少单体坐标，已定位到原图层。"
+        : "该记录缺少单体坐标，暂时无法定位原图层。";
+    },
+
+    async restoreChange(record) {
+      if (!this.sceneReady || this.saving || this.reloading || this.placementActive) return;
+      this.saving = true;
+      try {
+        await restoreFeatureChange(record.id);
+        if (this.disposed) return;
+        this.changesRevision++;
+        this.sceneController.restore(record.id);
+        const [deleted, dynamic] = await Promise.allSettled([
+          loadDeletedFeatureIds(),
+          this.refreshDynamic("单体已恢复。"),
+        ]);
+        if (this.disposed) return;
+        if (deleted.status === "fulfilled") {
+          this.sceneController.setDeletedKeys(deleted.value);
+        } else {
+          this.status = "单体已恢复，隐藏列表同步失败，刷新页面可同步。";
+        }
+        if (dynamic.status === "rejected" || !dynamic.value) {
+          this.status += " 动态图层刷新失败。";
+        }
+      } catch (error) {
+        if (!this.disposed) this.status = `恢复失败。 ${error.message}`;
+      } finally {
+        if (!this.disposed) this.saving = false;
+      }
     },
 
     onSceneClick(position) {
@@ -372,6 +452,7 @@ export default {
       if (refreshed) this.releasePendingMoveMasks();
       this.canRetryDynamic = !refreshed && layer.enabled;
       this.status = this.canRetryDynamic ? "变更已保存，刷新动态模型失败，请重试。" : successMessage;
+      return refreshed;
     },
 
     async retryDynamic() {
@@ -393,11 +474,13 @@ export default {
         if (initialPlacement) {
           await movePlacement(source.id, placedModel.modelMatrix, placedModel.frontTexture);
         } else {
+          const { anchor } = this.placement;
           await savePlacement(placedModel, source
-            ? { tilesetId: source.layerId, featureId: source.id }
+            ? { tilesetId: source.layerId, featureId: source.id, worldBounds: this.anchorBounds(anchor) }
             : undefined);
         }
         if (this.disposed) return;
+        this.changesRevision++;
 
         this.$refs.placement.disposePlacement();
         if (initialPlacement) {
@@ -424,8 +507,9 @@ export default {
       this.saving = true;
       this.selectionError = "";
       try {
-        await hideFeature(layerId, id, action);
+        await hideFeature(layerId, id, action, undefined, this.anchorBounds(this.selectedAnchor));
         if (this.disposed) return;
+        this.changesRevision++;
         this.sceneController.hide(key);
         this.selectFeature();
         if (layerId === DYNAMIC_TILESET_ID) await this.refreshDynamic("动态单体已删除。");
@@ -435,6 +519,10 @@ export default {
       } finally {
         if (!this.disposed) this.saving = false;
       }
+    },
+
+    anchorBounds(anchor) {
+      return anchor ? [anchor.x, anchor.y, anchor.z, 1] : undefined;
     },
   },
 };

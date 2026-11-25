@@ -10,19 +10,35 @@ async function request(path, options) {
 export function loadTilesetConfig() {
   return Promise.all([
     request("/api/tilesets"),
-    request("/api/tilesets/deleted"),
+    loadDeletedFeatureIds(),
   ]);
+}
+
+export function loadDeletedFeatureIds() {
+  return request("/api/tilesets/deleted");
+}
+
+export function loadFeatureChanges(params) {
+  return request(`/api/tilesets/changes?${new URLSearchParams(params)}`);
+}
+
+export function restoreFeatureChange(id) {
+  return request("/api/tilesets/changes/restore", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id }),
+  });
 }
 
 export function loadModelCatalog() {
   return request("/api/models");
 }
 
-export function hideFeature(tilesetId, featureId, action, modelId) {
+export function hideFeature(tilesetId, featureId, action, modelId, worldBounds) {
   return request("/api/tilesets/feature", {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tilesetId, featureId, action, modelId }),
+    body: JSON.stringify({ tilesetId, featureId, action, modelId, worldBounds }),
   });
 }
 

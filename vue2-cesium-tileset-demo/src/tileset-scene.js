@@ -34,6 +34,7 @@ export default class TilesetScene {
   constructor(container, configs, deletedIds, onSceneClick) {
     this.destroyed = false;
     this.hiddenKeys = new Set(deletedIds);
+    this.configuredHiddenKeys = new Set();
     this.temporaryHiddenKeys = new Set();
     this.hiddenRevision = 0;
     this.selectedKey = undefined;
@@ -45,7 +46,7 @@ export default class TilesetScene {
       this.layers.set(config.id, {});
       for (const value of config.hideFeatureIds ?? []) {
         const id = normalizeFeatureId(value);
-        if (id !== undefined) this.hiddenKeys.add(featureKey(config.id, id));
+        if (id !== undefined) this.configuredHiddenKeys.add(featureKey(config.id, id));
       }
     }
 
@@ -155,8 +156,21 @@ export default class TilesetScene {
     this.viewer.scene.requestRender();
   }
 
+  setDeletedKeys(keys) {
+    this.hiddenKeys = new Set(keys);
+    this.hiddenRevision++;
+    this.viewer.scene.requestRender();
+  }
+
+  restore(key) {
+    this.hiddenKeys.delete(key);
+    this.configuredHiddenKeys.delete(key);
+    this.hiddenRevision++;
+    this.viewer.scene.requestRender();
+  }
+
   isHidden(key) {
-    return this.hiddenKeys.has(key) || this.temporaryHiddenKeys.has(key);
+    return this.hiddenKeys.has(key) || this.configuredHiddenKeys.has(key) || this.temporaryHiddenKeys.has(key);
   }
 
   setTemporaryHidden(key, hidden) {
@@ -327,6 +341,44 @@ export default class TilesetScene {
         cancel: () => resolve(false),
       });
     });
+  }
+
+  flyToFeatureBounds(bounds) {
+    const { camera } = this.viewer;
+    const sphere = new Cesium.BoundingSphere(Cesium.Cartesian3.fromArray(bounds), bounds[3]);
+    camera.flyToBoundingSphere(sphere, {
+      duration: 1,
+      offset: new Cesium.HeadingPitchRange(
+        camera.heading,
+        Cesium.Math.toRadians(-25),
+        Cesium.Math.clamp(sphere.radius * 2, 15, 40),
+      ),
+    });
+  }
+
+  findLoadedFeatureBounds(layerId, key) {
+    const tileset = this.layers.get(layerId)?.tileset;
+    if (!tileset?.root || layerId === DYNAMIC_TILESET_ID) return undefined;
+    const config = this.layersByTileset.get(tileset);
+    const tiles = [tileset.root];
+    let best;
+    while (tiles.length > 0) {
+      const tile = tiles.pop();
+      for (const child of tile.children) tiles.push(child);
+      if (!tile.contentReady || (best && tile.boundingSphere.radius >= best.radius)) continue;
+      const contents = [tile.content];
+      while (contents.length > 0) {
+        const content = contents.pop();
+        for (const inner of content.innerContents ?? []) contents.push(inner);
+        if (!content.featuresLength) continue;
+        const state = this.contentStates.get(content) ?? this.indexContent(content, config);
+        if (state.featuresByKey.has(key)) {
+          best = tile.boundingSphere;
+          break;
+        }
+      }
+    }
+    return best && [...Cesium.Cartesian3.pack(best.center, []), best.radius];
   }
 
   async loadDefaults(layers) {

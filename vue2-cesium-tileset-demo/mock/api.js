@@ -1,7 +1,7 @@
 const { mkdirSync, readFileSync, renameSync, writeFileSync } = require("node:fs");
 const { basename, dirname, resolve } = require("node:path");
 const express = require("express");
-const { Matrix3, Matrix4 } = require("cesium");
+const { BoundingSphere, Cartesian3, Matrix3, Matrix4 } = require("cesium");
 const { DYNAMIC_TILESET_ID, featureKey, normalizeFeatureId } = require("../src/feature-id");
 const { FRONT_TEXTURE_MAX_BYTES, FRONT_TEXTURE_TYPES, applyFrontTexture } = require("../src/front-texture");
 const tilesets = require("./tilesets.json");
@@ -31,6 +31,21 @@ function isFrontTextureValid(value, model) {
 
 function isFiniteArray(value, length) {
   return Array.isArray(value) && value.length === length && value.every(Number.isFinite);
+}
+
+function isBounds(value) {
+  return isFiniteArray(value, 4) && value[3] > 0;
+}
+
+function changeSummary(record) {
+  const { id, tilesetId, featureId, modelId, action, deleted, modelMatrix, localBounds } = record;
+  let worldBounds = isBounds(record.worldBounds) ? record.worldBounds : undefined;
+  if (tilesetId === DYNAMIC_TILESET_ID && isBounds(localBounds) && isPlacementMatrix(modelMatrix)) {
+    const local = new BoundingSphere(Cartesian3.fromArray(localBounds), localBounds[3]);
+    const world = BoundingSphere.transform(local, Matrix4.fromArray(modelMatrix));
+    worldBounds = [...Cartesian3.pack(world.center, []), world.radius];
+  }
+  return { id, tilesetId, featureId, modelId, action, deleted, worldBounds };
 }
 
 function isPlacementMatrix(value) {
@@ -68,7 +83,13 @@ function createMockApi() {
   let records = new Map();
   for (const record of savedRecords ?? []) {
     // 老版文件中每一项都是已删除或被替换的原单体。
-    records.set(record.id, { ...record, deleted: record.deleted ?? true });
+    const separator = record.id.indexOf(":");
+    records.set(record.id, {
+      ...record,
+      tilesetId: record.tilesetId ?? record.id.slice(0, separator),
+      featureId: normalizeFeatureId(record.featureId) ?? record.id.slice(separator + 1),
+      deleted: record.deleted ?? true,
+    });
   }
 
   function commitRecords(next, res) {
@@ -117,7 +138,12 @@ function createMockApi() {
   }));
 
   router.get("/tilesets", (req, res) => {
-    res.json(allTilesets);
+    res.json(allTilesets.map((layer) => {
+      if (!layer.hideFeatureIds) return layer;
+      const hideFeatureIds = layer.hideFeatureIds.filter((id) =>
+        records.get(featureKey(layer.id, id))?.deleted !== false);
+      return { ...layer, hideFeatureIds };
+    }));
   });
 
   router.get("/tilesets/dynamic", (req, res) => {
@@ -126,6 +152,50 @@ function createMockApi() {
 
   router.get("/tilesets/deleted", (req, res) => {
     res.json([...records.values()].filter(({ deleted }) => deleted).map(({ id }) => id));
+  });
+
+  router.get("/tilesets/changes", (req, res) => {
+    const { page = "1", pageSize = "10", modelId = "", featureId = "", status = "all" } = req.query;
+    const positiveInteger = (value) => typeof value === "string" && /^[1-9]\d*$/.test(value) &&
+      Number.isSafeInteger(Number(value));
+    if (!positiveInteger(page) || !positiveInteger(pageSize) || Number(pageSize) > 100 ||
+        typeof modelId !== "string" || typeof featureId !== "string" ||
+        !["all", "deleted", "active"].includes(status)) {
+      return res.status(400).json({ message: "分页或筛选参数无效。" });
+    }
+
+    const modelQuery = modelId.trim().toLowerCase();
+    const featureQuery = featureId.trim().toLowerCase();
+    const matches = [...records.values()].reverse().filter((record) =>
+      (status === "all" || record.deleted === (status === "deleted")) &&
+      String(record.modelId ?? "").toLowerCase().includes(modelQuery) &&
+      record.featureId.toLowerCase().includes(featureQuery));
+    const size = Number(pageSize);
+    const currentPage = Math.min(Number(page), Math.max(1, Math.ceil(matches.length / size)));
+    const offset = (currentPage - 1) * size;
+    res.json({
+      items: matches.slice(offset, offset + size).map(changeSummary),
+      total: matches.length,
+      page: currentPage,
+      pageSize: size,
+    });
+  });
+
+  router.post("/tilesets/changes/restore", express.json({ limit: "8kb" }), (req, res) => {
+    const { id } = req.body ?? {};
+    if (typeof id !== "string" || !id.trim()) {
+      return res.status(400).json({ message: "缺少有效的修改记录 ID。" });
+    }
+    const record = records.get(id);
+    if (!record) return res.status(404).json({ message: "修改记录不存在。" });
+    if (!record.deleted) return res.json(changeSummary(record));
+    if (record.tilesetId === DYNAMIC_TILESET_ID &&
+        (!record.url || !isPlacementMatrix(record.modelMatrix) || !isBounds(record.localBounds))) {
+      return res.status(409).json({ message: "该动态记录缺少原模型或摆放数据，无法恢复。" });
+    }
+
+    const next = new Map(records).set(id, { ...record, deleted: false });
+    if (commitRecords(next, res)) res.json(changeSummary(next.get(id)));
   });
 
   router.get("/tilesets/placements/:featureId", (req, res) => {
@@ -160,7 +230,7 @@ function createMockApi() {
     if (typeof placementId !== "string" ||
         !/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(placementId) ||
         !model || !isPlacementMatrix(modelMatrix) ||
-        !isFiniteArray(localBounds, 4) || localBounds[3] <= 0) {
+        !isBounds(localBounds)) {
       return res.status(400).json({ message: "摆放 ID、模型、变换矩阵或包围球无效。" });
     }
 
@@ -171,8 +241,9 @@ function createMockApi() {
     const id = featureKey(DYNAMIC_TILESET_ID, placementId.toLowerCase());
     let replaces;
     let source;
+    let sourceBounds;
     if (replacement !== undefined) {
-      const { tilesetId, featureId } = replacement ?? {};
+      const { tilesetId, featureId, worldBounds } = replacement ?? {};
       const rawId = normalizeFeatureId(featureId);
       if (!layerIds.has(tilesetId) || rawId === undefined) {
         return res.status(400).json({ message: "被替换单体的图层或 ID 无效。" });
@@ -183,6 +254,7 @@ function createMockApi() {
         return res.status(400).json({ message: "被替换的动态单体无效。" });
       }
       replaces = { id: sourceId, tilesetId, featureId: rawId };
+      if (isBounds(worldBounds)) sourceBounds = worldBounds;
     }
 
     const action = replaces ? "replace" : "place";
@@ -215,7 +287,12 @@ function createMockApi() {
     }
 
     const next = new Map(records);
-    if (replaces) next.set(replaces.id, { ...source, ...replaces, action: "replace", deleted: true });
+    if (replaces) {
+      next.set(replaces.id, {
+        ...source, ...replaces, action: "replace", deleted: true,
+        worldBounds: sourceBounds ?? source?.worldBounds,
+      });
+    }
     next.set(id, record);
     if (!commitRecords(next, res)) return;
 
@@ -223,7 +300,7 @@ function createMockApi() {
   });
 
   router.delete("/tilesets/feature", express.json({ limit: "8kb" }), (req, res) => {
-    const { tilesetId, featureId, action = "delete", modelId } = req.body ?? {};
+    const { tilesetId, featureId, action = "delete", modelId, worldBounds } = req.body ?? {};
     const rawId = normalizeFeatureId(featureId);
     if (!layerIds.has(tilesetId) || rawId === undefined || !["delete", "replace"].includes(action)) {
       return res.status(400).json({ message: "图层、单体 ID 或操作类型无效。" });
@@ -242,6 +319,7 @@ function createMockApi() {
       return res.json(previous);
     }
     const record = { ...previous, id, tilesetId, featureId: rawId, action, deleted: true };
+    if (isBounds(worldBounds)) record.worldBounds = worldBounds;
     if (modelId !== undefined && tilesetId !== DYNAMIC_TILESET_ID) record.modelId = modelId;
     if (!commitRecords(new Map(records).set(id, record), res)) return;
 
