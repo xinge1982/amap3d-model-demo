@@ -14,8 +14,8 @@ function featureKey(tilesetId, featureId) {
   return `${tilesetId}:${featureId}`;
 }
 
-function readFeatureId(feature) {
-  return normalizeFeatureId(feature?.getProperty?.("id"));
+function readFeatureId(feature, field = "id") {
+  return normalizeFeatureId(feature?.getProperty?.(field));
 }
 
 module.exports = { DYNAMIC_TILESET_ID, featureKey, normalizeFeatureId, readFeatureId };

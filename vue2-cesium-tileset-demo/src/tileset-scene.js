@@ -138,7 +138,7 @@ export default class TilesetScene {
 
     const id = config.id === DYNAMIC_TILESET_ID
       ? dynamicContentId(content)
-      : readFeatureId(feature);
+      : readFeatureId(feature, config.featureIdField || config.idField);
     if (id === undefined) return { missingId: true };
     const key = featureKey(config.id, id);
     if (this.isHidden(key)) return undefined;
@@ -186,7 +186,7 @@ export default class TilesetScene {
     for (let i = 0; i < content.featuresLength; i++) {
       const feature = content.getFeature(i);
       this.layersByFeature.set(feature, config);
-      const id = readFeatureId(feature);
+      const id = readFeatureId(feature, config.featureIdField || config.idField);
       if (id === undefined) continue;
       const key = featureKey(config.id, id);
       if (!featuresByKey.has(key)) featuresByKey.set(key, []);

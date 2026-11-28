@@ -138,12 +138,33 @@ function createMockApi() {
   }));
 
   router.get("/tilesets", (req, res) => {
-    res.json(allTilesets.map((layer) => {
-      if (!layer.hideFeatureIds) return layer;
-      const hideFeatureIds = layer.hideFeatureIds.filter((id) =>
-        records.get(featureKey(layer.id, id))?.deleted !== false);
-      return { ...layer, hideFeatureIds };
-    }));
+    const data = allTilesets.map((layer) => {
+      const {
+        id, name, type, url, options, children = [], idField = "id",
+        featureIdField = idField, zClip = { enabled: false, offset: 0 },
+        title, defaultLoad, focus, viewPoint, clip,
+      } = layer;
+      const hideFeatureIds = layer.hideFeatureIds?.filter((featureId) =>
+        records.get(featureKey(id, featureId))?.deleted !== false);
+      return {
+        value: id,
+        label: name || id,
+        type,
+        url,
+        options: options && Object.entries(options).map(([key, value]) => [key, String(value)]),
+        children,
+        idField,
+        featureIdField,
+        zClip,
+        title,
+        defaultLoad,
+        focus,
+        viewPoint,
+        clip,
+        hideFeatureIds,
+      };
+    });
+    res.json({ code: 200, data });
   });
 
   router.get("/tilesets/dynamic", (req, res) => {

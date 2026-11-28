@@ -7,11 +7,30 @@ async function request(path, options) {
   return data;
 }
 
-export function loadTilesetConfig() {
-  return Promise.all([
+function parseTilesetOption(value) {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  if (value.trim() !== "" && Number.isFinite(Number(value))) return Number(value);
+  return value;
+}
+
+export async function loadTilesetConfig() {
+  const [result, deletedIds] = await Promise.all([
     request("/api/tilesets"),
     loadDeletedFeatureIds(),
   ]);
+  if (result?.code !== 200 || !Array.isArray(result.data)) {
+    throw new Error("图层接口应返回 { code: 200, data: [...] }。");
+  }
+
+  const configs = result.data.map(({ value, label, options = [], ...layer }) => ({
+    ...layer,
+    id: value,
+    name: label || value,
+    defaultLoad: layer.defaultLoad ?? true,
+    options: Object.fromEntries(options.map(([key, setting]) => [key, parseTilesetOption(setting)])),
+  }));
+  return [configs, deletedIds];
 }
 
 export function loadDeletedFeatureIds() {
